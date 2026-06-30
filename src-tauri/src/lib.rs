@@ -13,6 +13,8 @@ use std::thread;
 use std::sync::Arc;
 use parking_lot::RwLock;
 use tauri::{AppHandle, Manager, State};
+use tauri::tray::{TrayIconBuilder, MouseButton, MouseButtonState, TrayIconEvent};
+use tauri::menu::{Menu, MenuItem};
 use serde::{Deserialize, Serialize};
 
 use config::{ConfigManager, Snippet, AppSettings};
@@ -251,6 +253,37 @@ pub fn run() {
     
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .setup(|app| {
+            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let show_i = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
+
+            let _tray = TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&menu)
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "quit" => {
+                        app.exit(0);
+                    }
+                    "show" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
+                        if let Some(window) = tray.app_handle().get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                })
+                .build(app)?;
+            Ok(())
+        })
         .manage(app_state)
         .invoke_handler(tauri::generate_handler![
             // Snippets
