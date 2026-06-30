@@ -12,10 +12,10 @@ use std::sync::mpsc;
 use std::thread;
 use std::sync::Arc;
 use parking_lot::RwLock;
-use tauri::{AppHandle, Manager, State};
+use tauri::{Manager, State};
 use tauri::tray::{TrayIconBuilder, MouseButton, MouseButtonState, TrayIconEvent};
 use tauri::menu::{Menu, MenuItem};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use config::{ConfigManager, Snippet, AppSettings};
 use trigger_engine::TriggerEngine;

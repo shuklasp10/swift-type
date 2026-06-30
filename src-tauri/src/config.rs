@@ -163,6 +163,7 @@ impl ConfigManager {
     }
     
     /// Get the config directory path
+    #[allow(dead_code)]
     pub fn config_dir(&self) -> &PathBuf {
         &self.config_dir
     }
@@ -223,6 +224,7 @@ impl ConfigManager {
     }
     
     /// Get snippets as mutable
+    #[allow(dead_code)]
     pub fn snippets_mut(&mut self) -> &mut Vec<Snippet> {
         &mut self.config.matches
     }
@@ -263,6 +265,7 @@ impl ConfigManager {
     }
     
     /// Find a snippet that matches the given buffer
+    #[allow(dead_code)]
     pub fn find_matching_snippet(&self, buffer: &str) -> Option<&Snippet> {
         for snippet in &self.config.matches {
             if let Some(ref trigger) = snippet.trigger {

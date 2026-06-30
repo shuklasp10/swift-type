@@ -8,9 +8,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use parking_lot::RwLock;
 
-use crate::config::{ConfigManager, Snippet};
-use crate::text_injector::{InjectionMethod, replace_text};
-use crate::keyboard_hook;
+use crate::config::ConfigManager;
+use crate::text_injector::{replace_text, InjectionMethod};
 
 /// Compiled regex cache
 pub struct TriggerEngine {
@@ -51,6 +50,7 @@ impl TriggerEngine {
     }
     
     /// Set injection method
+    #[allow(dead_code)]
     pub fn set_injection_method(&mut self, method: InjectionMethod) {
         self.injection_method = method;
     }
@@ -62,7 +62,7 @@ impl TriggerEngine {
         }
         
         // Collect matching info first to avoid borrow issues
-        let match_info: Option<(Option<(String, usize)>, Option<(String, String, String, bool)>)> = {
+        let _match_info: Option<(Option<(String, usize)>, Option<(String, String, String, bool)>)> = {
             let config = self.config.read();
             
             for snippet in config.snippets() {

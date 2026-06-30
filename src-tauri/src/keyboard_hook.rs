@@ -40,7 +40,6 @@ static IS_INJECTING: AtomicBool = AtomicBool::new(false);
 /// Virtual key codes for printable characters
 const VK_BACK: u32 = 0x08;
 const VK_RETURN: u32 = 0x0D;
-const VK_SPACE: u32 = 0x20;
 const VK_TAB: u32 = 0x09;
 const VK_ESCAPE: u32 = 0x1B;
 
