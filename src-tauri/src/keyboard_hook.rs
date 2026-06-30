@@ -3,9 +3,11 @@
 //! Implements a global low-level keyboard hook using Windows API
 //! to capture keystrokes for text expansion functionality.
 
-use once_cell::sync::Lazy;
-use parking_lot::Mutex;
+use once_cell::sync::OnceCell;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::Sender;
+use parking_lot::Mutex;
+use once_cell::sync::Lazy;
 use windows::Win32::Foundation::{HINSTANCE, LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, SetWindowsHookExW, UnhookWindowsHookEx, 
@@ -13,11 +15,15 @@ use windows::Win32::UI::WindowsAndMessaging::{
     LLKHF_INJECTED, LLKHF_LOWER_IL_INJECTED,
 };
 
-/// Maximum buffer size for typed characters
-const MAX_BUFFER_SIZE: usize = 256;
+/// Keyboard event sent to the worker thread
+#[derive(Debug, Clone, Copy)]
+pub enum HookEvent {
+    Char(char),
+    Backspace,
+    Clear,
+}
 
 /// Wrapper for HHOOK to make it Send + Sync safe
-/// SAFETY: HHOOK is just a handle (pointer) that can be used from any thread
 struct SendHHOOK(HHOOK);
 unsafe impl Send for SendHHOOK {}
 unsafe impl Sync for SendHHOOK {}
@@ -25,19 +31,11 @@ unsafe impl Sync for SendHHOOK {}
 /// Global hook handle
 static HOOK_HANDLE: Lazy<Mutex<Option<SendHHOOK>>> = Lazy::new(|| Mutex::new(None));
 
-/// Buffer for typed characters
-static KEYSTROKE_BUFFER: Lazy<Mutex<String>> = Lazy::new(|| Mutex::new(String::with_capacity(MAX_BUFFER_SIZE)));
+/// Global sender for passing keystrokes to the worker thread
+static HOOK_SENDER: OnceCell<Sender<HookEvent>> = OnceCell::new();
 
 /// Flag to indicate if we're currently injecting text (to avoid recursive hooks)
 static IS_INJECTING: AtomicBool = AtomicBool::new(false);
-
-/// Flag to indicate the current keystroke should be blocked (trigger was matched)
-static SHOULD_BLOCK_KEYSTROKE: AtomicBool = AtomicBool::new(false);
-
-/// Callback function pointer for when a trigger is detected
-/// Returns true if a trigger was matched and keystroke should be blocked
-static TRIGGER_CALLBACK: Lazy<Mutex<Option<Box<dyn Fn(String) -> bool + Send + Sync>>>> = 
-    Lazy::new(|| Mutex::new(None));
 
 /// Virtual key codes for printable characters
 const VK_BACK: u32 = 0x08;
@@ -46,24 +44,9 @@ const VK_SPACE: u32 = 0x20;
 const VK_TAB: u32 = 0x09;
 const VK_ESCAPE: u32 = 0x1B;
 
-/// Set the trigger detection callback
-/// The callback should return true if a trigger was matched (to block the keystroke)
-pub fn set_trigger_callback<F>(callback: F) 
-where 
-    F: Fn(String) -> bool + Send + Sync + 'static 
-{
-    let mut cb = TRIGGER_CALLBACK.lock();
-    *cb = Some(Box::new(callback));
-}
-
-/// Get the current keystroke buffer
-pub fn get_buffer() -> String {
-    KEYSTROKE_BUFFER.lock().clone()
-}
-
-/// Clear the keystroke buffer
-pub fn clear_buffer() {
-    KEYSTROKE_BUFFER.lock().clear();
+/// Set the channel sender for keyboard events
+pub fn set_event_sender(sender: Sender<HookEvent>) -> Result<(), &'static str> {
+    HOOK_SENDER.set(sender).map_err(|_| "Sender already set")
 }
 
 /// Set the injecting flag to prevent hook recursion
@@ -74,13 +57,6 @@ pub fn set_injecting(value: bool) {
 /// Check if we're currently injecting
 pub fn is_injecting() -> bool {
     IS_INJECTING.load(Ordering::SeqCst)
-}
-
-/// Remove characters from the end of the buffer
-pub fn remove_chars_from_buffer(count: usize) {
-    let mut buffer = KEYSTROKE_BUFFER.lock();
-    let new_len = buffer.len().saturating_sub(count);
-    buffer.truncate(new_len);
 }
 
 /// Convert virtual key code to character (simplified)
@@ -149,37 +125,19 @@ unsafe extern "system" fn keyboard_hook_callback(
             
             match vk_code {
                 VK_BACK => {
-                    // Handle backspace - remove last character from buffer
-                    let mut buffer = KEYSTROKE_BUFFER.lock();
-                    buffer.pop();
+                    if let Some(sender) = HOOK_SENDER.get() {
+                        let _ = sender.send(HookEvent::Backspace);
+                    }
                 }
                 VK_RETURN | VK_ESCAPE | VK_TAB => {
-                    // Clear buffer on Enter, Escape, or Tab
-                    clear_buffer();
+                    if let Some(sender) = HOOK_SENDER.get() {
+                        let _ = sender.send(HookEvent::Clear);
+                    }
                 }
                 _ => {
-                    // Try to convert to character
                     if let Some(ch) = vk_to_char(vk_code, is_shift_pressed()) {
-                        let mut buffer = KEYSTROKE_BUFFER.lock();
-                        buffer.push(ch);
-                        
-                        // Prevent buffer from growing too large
-                        if buffer.len() > MAX_BUFFER_SIZE {
-                            let drain_count = buffer.len() - MAX_BUFFER_SIZE / 2;
-                            buffer.drain(..drain_count);
-                        }
-                        
-                        // Clone buffer and trigger callback
-                        let buffer_content = buffer.clone();
-                        drop(buffer); // Release lock before callback
-                        
-                        // Call trigger callback if set
-                        let callback = TRIGGER_CALLBACK.lock();
-                        if let Some(ref cb) = *callback {
-                            if cb(buffer_content) {
-                                // Trigger was matched - block this keystroke
-                                SHOULD_BLOCK_KEYSTROKE.store(true, Ordering::SeqCst);
-                            }
+                        if let Some(sender) = HOOK_SENDER.get() {
+                            let _ = sender.send(HookEvent::Char(ch));
                         }
                     }
                 }
@@ -187,11 +145,7 @@ unsafe extern "system" fn keyboard_hook_callback(
         }
     }
     
-    // Check if we should block the keystroke
-    if SHOULD_BLOCK_KEYSTROKE.swap(false, Ordering::SeqCst) {
-        return LRESULT(1); // Block the keystroke
-    }
-
+    // Always pass to the next hook. We never block keystrokes here to avoid deadlocks.
     CallNextHookEx(None, n_code, w_param, l_param)
 }
 
@@ -219,6 +173,7 @@ pub fn install_hook() -> Result<(), String> {
 }
 
 /// Uninstall the keyboard hook
+#[allow(dead_code)]
 pub fn uninstall_hook() -> Result<(), String> {
     let mut handle = HOOK_HANDLE.lock();
     

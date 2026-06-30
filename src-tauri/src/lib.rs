@@ -8,6 +8,8 @@ mod text_injector;
 mod config;
 mod trigger_engine;
 
+use std::sync::mpsc;
+use std::thread;
 use std::sync::Arc;
 use parking_lot::RwLock;
 use tauri::{AppHandle, Manager, State};
@@ -20,6 +22,7 @@ use trigger_engine::TriggerEngine;
 pub struct AppState {
     config: Arc<RwLock<ConfigManager>>,
     engine: Arc<RwLock<TriggerEngine>>,
+    keystroke_buffer: Arc<RwLock<String>>,
 }
 
 // ============================================================================
@@ -111,14 +114,14 @@ fn toggle_engine(state: State<AppState>, enabled: bool) -> Result<(), String> {
 
 /// Clear the keystroke buffer
 #[tauri::command]
-fn clear_buffer() {
-    keyboard_hook::clear_buffer();
+fn clear_buffer(state: State<AppState>) {
+    state.keystroke_buffer.write().clear();
 }
 
 /// Get current keystroke buffer (for debugging)
 #[tauri::command]
-fn get_buffer() -> String {
-    keyboard_hook::get_buffer()
+fn get_buffer(state: State<AppState>) -> String {
+    state.keystroke_buffer.read().clone()
 }
 
 #[derive(Serialize)]
@@ -160,22 +163,55 @@ fn search_snippets(state: State<AppState>, query: String) -> Vec<Snippet> {
 // Application Setup
 // ============================================================================
 
-fn setup_trigger_callback(engine: Arc<RwLock<TriggerEngine>>) {
-    keyboard_hook::set_trigger_callback(move |buffer| {
-        let mut eng = engine.write();
-        if let Some(result) = eng.process_buffer(&buffer) {
-            if !result.has_form {
-                if let Err(e) = eng.execute_expansion(&result) {
-                    log::error!("Failed to execute expansion: {}", e);
-                    return false;
+fn spawn_worker_thread(
+    engine: Arc<RwLock<TriggerEngine>>,
+    shared_buffer: Arc<RwLock<String>>,
+) -> Result<(), &'static str> {
+    let (tx, rx) = mpsc::channel();
+    
+    keyboard_hook::set_event_sender(tx)?;
+    
+    thread::spawn(move || {
+        for event in rx {
+            let mut current_buffer = shared_buffer.write();
+            
+            match event {
+                keyboard_hook::HookEvent::Char(c) => {
+                    current_buffer.push(c);
+                    // Prevent buffer from growing unbounded
+                    if current_buffer.len() > 256 {
+                        let drain_count = current_buffer.len() - 128;
+                        current_buffer.drain(..drain_count);
+                    }
                 }
-                return true; // Trigger matched, block keystroke
+                keyboard_hook::HookEvent::Backspace => {
+                    current_buffer.pop();
+                }
+                keyboard_hook::HookEvent::Clear => {
+                    current_buffer.clear();
+                }
             }
-            // TODO: Handle form-based snippets by emitting event to frontend
-            return true; // Still matched, block keystroke
+            
+            // Clone buffer and release lock before evaluating triggers
+            let buffer_content = current_buffer.clone();
+            drop(current_buffer);
+            
+            let mut eng = engine.write();
+            if let Some(result) = eng.process_buffer(&buffer_content) {
+                if !result.has_form {
+                    if let Err(e) = eng.execute_expansion(&result) {
+                        log::error!("Failed to execute expansion: {}", e);
+                    } else {
+                        // Success! Clear buffer
+                        shared_buffer.write().clear();
+                    }
+                }
+                // TODO: Handle form-based snippets by emitting event to frontend
+            }
         }
-        false // No trigger matched
     });
+    
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -199,15 +235,19 @@ pub fn run() {
     // Initialize trigger engine
     let engine = Arc::new(RwLock::new(TriggerEngine::new(config.clone())));
     
-    // Set up trigger callback
-    setup_trigger_callback(engine.clone());
+    let shared_buffer = Arc::new(RwLock::new(String::with_capacity(256)));
+    
+    // Set up background worker
+    if let Err(e) = spawn_worker_thread(engine.clone(), shared_buffer.clone()) {
+        log::error!("Failed to spawn worker thread: {}", e);
+    }
     
     // Install keyboard hook
     if let Err(e) = keyboard_hook::install_hook() {
         log::error!("Failed to install keyboard hook: {}", e);
     }
     
-    let app_state = AppState { config, engine };
+    let app_state = AppState { config, engine, keystroke_buffer: shared_buffer };
     
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())

@@ -185,7 +185,6 @@ impl TriggerEngine {
     /// Execute the expansion
     pub fn execute_expansion(&self, result: &ExpansionResult) -> Result<(), String> {
         replace_text(result.trigger_len, &result.replacement, self.injection_method)?;
-        keyboard_hook::clear_buffer();
         log::info!("Expanded snippet: {}", result.snippet_id);
         Ok(())
     }

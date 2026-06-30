@@ -226,8 +226,5 @@ pub fn replace_text(trigger_len: usize, replacement: &str, method: InjectionMeth
     // Inject the replacement text
     inject_text(replacement, method)?;
     
-    // Update the keyboard buffer
-    keyboard_hook::remove_chars_from_buffer(trigger_len);
-    
     Ok(())
 }

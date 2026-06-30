@@ -69,37 +69,6 @@ vite.config.ts
 <files>
 This section contains the contents of the repository's files.
 
-<file path="repomix.config.json">
-{
-  "output": {
-    "filePath": "repomix-output.xml",
-    "style": "xml",
-    "fileSummary": true,
-    "directoryStructure": true,
-    "removeComments": false,
-    "removeEmptyLines": false,
-    "topFilesLength": 5,
-    "showLineNumbers": false
-  },
-  "ignore": {
-    "useGitignore": true,
-    "useDefaultPatterns": true,
-    "customPatterns": [
-      "src-tauri/target/**",
-      "dist/**",
-      ".vscode/**",
-      "package-lock.json",
-      "src-tauri/icons/**",
-      "src/assets/**",
-      "public/**"
-    ]
-  },
-  "security": {
-    "enableSecurityCheck": true
-  }
-}
-</file>
-
 <file path=".gitignore">
 # Logs
 logs
@@ -142,37 +111,6 @@ dist-ssr
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-</file>
-
-<file path="package.json">
-{
-  "name": "tauri-app",
-  "private": true,
-  "version": "0.1.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
-    "tauri": "tauri",
-    "repomix": "repomix"
-  },
-  "dependencies": {
-    "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-opener": "^2",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0"
-  },
-  "devDependencies": {
-    "@tauri-apps/cli": "^2",
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
-    "@vitejs/plugin-react": "^4.6.0",
-    "repomix": "^1.16.0",
-    "typescript": "~5.8.3",
-    "vite": "^7.0.4"
-  }
-}
 </file>
 
 <file path="README.md">
@@ -289,6 +227,37 @@ npm run tauri build
 ## License
 
 MIT License
+</file>
+
+<file path="repomix.config.json">
+{
+  "output": {
+    "filePath": "repomix-output.xml",
+    "style": "xml",
+    "fileSummary": true,
+    "directoryStructure": true,
+    "removeComments": false,
+    "removeEmptyLines": false,
+    "topFilesLength": 5,
+    "showLineNumbers": false
+  },
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      "src-tauri/target/**",
+      "dist/**",
+      ".vscode/**",
+      "package-lock.json",
+      "src-tauri/icons/**",
+      "src/assets/**",
+      "public/**"
+    ]
+  },
+  "security": {
+    "enableSecurityCheck": true
+  }
+}
 </file>
 
 <file path="src-tauri/.gitignore">
@@ -711,9 +680,11 @@ fn create_default_config() -> Config {
 //! Implements a global low-level keyboard hook using Windows API
 //! to capture keystrokes for text expansion functionality.
 
-use once_cell::sync::Lazy;
-use parking_lot::Mutex;
+use once_cell::sync::OnceCell;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::Sender;
+use parking_lot::Mutex;
+use once_cell::sync::Lazy;
 use windows::Win32::Foundation::{HINSTANCE, LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, SetWindowsHookExW, UnhookWindowsHookEx, 
@@ -721,11 +692,15 @@ use windows::Win32::UI::WindowsAndMessaging::{
     LLKHF_INJECTED, LLKHF_LOWER_IL_INJECTED,
 };
 
-/// Maximum buffer size for typed characters
-const MAX_BUFFER_SIZE: usize = 256;
+/// Keyboard event sent to the worker thread
+#[derive(Debug, Clone, Copy)]
+pub enum HookEvent {
+    Char(char),
+    Backspace,
+    Clear,
+}
 
 /// Wrapper for HHOOK to make it Send + Sync safe
-/// SAFETY: HHOOK is just a handle (pointer) that can be used from any thread
 struct SendHHOOK(HHOOK);
 unsafe impl Send for SendHHOOK {}
 unsafe impl Sync for SendHHOOK {}
@@ -733,19 +708,11 @@ unsafe impl Sync for SendHHOOK {}
 /// Global hook handle
 static HOOK_HANDLE: Lazy<Mutex<Option<SendHHOOK>>> = Lazy::new(|| Mutex::new(None));
 
-/// Buffer for typed characters
-static KEYSTROKE_BUFFER: Lazy<Mutex<String>> = Lazy::new(|| Mutex::new(String::with_capacity(MAX_BUFFER_SIZE)));
+/// Global sender for passing keystrokes to the worker thread
+static HOOK_SENDER: OnceCell<Sender<HookEvent>> = OnceCell::new();
 
 /// Flag to indicate if we're currently injecting text (to avoid recursive hooks)
 static IS_INJECTING: AtomicBool = AtomicBool::new(false);
-
-/// Flag to indicate the current keystroke should be blocked (trigger was matched)
-static SHOULD_BLOCK_KEYSTROKE: AtomicBool = AtomicBool::new(false);
-
-/// Callback function pointer for when a trigger is detected
-/// Returns true if a trigger was matched and keystroke should be blocked
-static TRIGGER_CALLBACK: Lazy<Mutex<Option<Box<dyn Fn(String) -> bool + Send + Sync>>>> = 
-    Lazy::new(|| Mutex::new(None));
 
 /// Virtual key codes for printable characters
 const VK_BACK: u32 = 0x08;
@@ -754,24 +721,9 @@ const VK_SPACE: u32 = 0x20;
 const VK_TAB: u32 = 0x09;
 const VK_ESCAPE: u32 = 0x1B;
 
-/// Set the trigger detection callback
-/// The callback should return true if a trigger was matched (to block the keystroke)
-pub fn set_trigger_callback<F>(callback: F) 
-where 
-    F: Fn(String) -> bool + Send + Sync + 'static 
-{
-    let mut cb = TRIGGER_CALLBACK.lock();
-    *cb = Some(Box::new(callback));
-}
-
-/// Get the current keystroke buffer
-pub fn get_buffer() -> String {
-    KEYSTROKE_BUFFER.lock().clone()
-}
-
-/// Clear the keystroke buffer
-pub fn clear_buffer() {
-    KEYSTROKE_BUFFER.lock().clear();
+/// Set the channel sender for keyboard events
+pub fn set_event_sender(sender: Sender<HookEvent>) -> Result<(), &'static str> {
+    HOOK_SENDER.set(sender).map_err(|_| "Sender already set")
 }
 
 /// Set the injecting flag to prevent hook recursion
@@ -782,13 +734,6 @@ pub fn set_injecting(value: bool) {
 /// Check if we're currently injecting
 pub fn is_injecting() -> bool {
     IS_INJECTING.load(Ordering::SeqCst)
-}
-
-/// Remove characters from the end of the buffer
-pub fn remove_chars_from_buffer(count: usize) {
-    let mut buffer = KEYSTROKE_BUFFER.lock();
-    let new_len = buffer.len().saturating_sub(count);
-    buffer.truncate(new_len);
 }
 
 /// Convert virtual key code to character (simplified)
@@ -857,37 +802,19 @@ unsafe extern "system" fn keyboard_hook_callback(
             
             match vk_code {
                 VK_BACK => {
-                    // Handle backspace - remove last character from buffer
-                    let mut buffer = KEYSTROKE_BUFFER.lock();
-                    buffer.pop();
+                    if let Some(sender) = HOOK_SENDER.get() {
+                        let _ = sender.send(HookEvent::Backspace);
+                    }
                 }
                 VK_RETURN | VK_ESCAPE | VK_TAB => {
-                    // Clear buffer on Enter, Escape, or Tab
-                    clear_buffer();
+                    if let Some(sender) = HOOK_SENDER.get() {
+                        let _ = sender.send(HookEvent::Clear);
+                    }
                 }
                 _ => {
-                    // Try to convert to character
                     if let Some(ch) = vk_to_char(vk_code, is_shift_pressed()) {
-                        let mut buffer = KEYSTROKE_BUFFER.lock();
-                        buffer.push(ch);
-                        
-                        // Prevent buffer from growing too large
-                        if buffer.len() > MAX_BUFFER_SIZE {
-                            let drain_count = buffer.len() - MAX_BUFFER_SIZE / 2;
-                            buffer.drain(..drain_count);
-                        }
-                        
-                        // Clone buffer and trigger callback
-                        let buffer_content = buffer.clone();
-                        drop(buffer); // Release lock before callback
-                        
-                        // Call trigger callback if set
-                        let callback = TRIGGER_CALLBACK.lock();
-                        if let Some(ref cb) = *callback {
-                            if cb(buffer_content) {
-                                // Trigger was matched - block this keystroke
-                                SHOULD_BLOCK_KEYSTROKE.store(true, Ordering::SeqCst);
-                            }
+                        if let Some(sender) = HOOK_SENDER.get() {
+                            let _ = sender.send(HookEvent::Char(ch));
                         }
                     }
                 }
@@ -895,11 +822,7 @@ unsafe extern "system" fn keyboard_hook_callback(
         }
     }
     
-    // Check if we should block the keystroke
-    if SHOULD_BLOCK_KEYSTROKE.swap(false, Ordering::SeqCst) {
-        return LRESULT(1); // Block the keystroke
-    }
-
+    // Always pass to the next hook. We never block keystrokes here to avoid deadlocks.
     CallNextHookEx(None, n_code, w_param, l_param)
 }
 
@@ -927,6 +850,7 @@ pub fn install_hook() -> Result<(), String> {
 }
 
 /// Uninstall the keyboard hook
+#[allow(dead_code)]
 pub fn uninstall_hook() -> Result<(), String> {
     let mut handle = HOOK_HANDLE.lock();
     
@@ -958,6 +882,8 @@ mod text_injector;
 mod config;
 mod trigger_engine;
 
+use std::sync::mpsc;
+use std::thread;
 use std::sync::Arc;
 use parking_lot::RwLock;
 use tauri::{AppHandle, Manager, State};
@@ -970,6 +896,7 @@ use trigger_engine::TriggerEngine;
 pub struct AppState {
     config: Arc<RwLock<ConfigManager>>,
     engine: Arc<RwLock<TriggerEngine>>,
+    keystroke_buffer: Arc<RwLock<String>>,
 }
 
 // ============================================================================
@@ -1061,14 +988,14 @@ fn toggle_engine(state: State<AppState>, enabled: bool) -> Result<(), String> {
 
 /// Clear the keystroke buffer
 #[tauri::command]
-fn clear_buffer() {
-    keyboard_hook::clear_buffer();
+fn clear_buffer(state: State<AppState>) {
+    state.keystroke_buffer.write().clear();
 }
 
 /// Get current keystroke buffer (for debugging)
 #[tauri::command]
-fn get_buffer() -> String {
-    keyboard_hook::get_buffer()
+fn get_buffer(state: State<AppState>) -> String {
+    state.keystroke_buffer.read().clone()
 }
 
 #[derive(Serialize)]
@@ -1110,22 +1037,55 @@ fn search_snippets(state: State<AppState>, query: String) -> Vec<Snippet> {
 // Application Setup
 // ============================================================================
 
-fn setup_trigger_callback(engine: Arc<RwLock<TriggerEngine>>) {
-    keyboard_hook::set_trigger_callback(move |buffer| {
-        let mut eng = engine.write();
-        if let Some(result) = eng.process_buffer(&buffer) {
-            if !result.has_form {
-                if let Err(e) = eng.execute_expansion(&result) {
-                    log::error!("Failed to execute expansion: {}", e);
-                    return false;
+fn spawn_worker_thread(
+    engine: Arc<RwLock<TriggerEngine>>,
+    shared_buffer: Arc<RwLock<String>>,
+) -> Result<(), &'static str> {
+    let (tx, rx) = mpsc::channel();
+    
+    keyboard_hook::set_event_sender(tx)?;
+    
+    thread::spawn(move || {
+        for event in rx {
+            let mut current_buffer = shared_buffer.write();
+            
+            match event {
+                keyboard_hook::HookEvent::Char(c) => {
+                    current_buffer.push(c);
+                    // Prevent buffer from growing unbounded
+                    if current_buffer.len() > 256 {
+                        let drain_count = current_buffer.len() - 128;
+                        current_buffer.drain(..drain_count);
+                    }
                 }
-                return true; // Trigger matched, block keystroke
+                keyboard_hook::HookEvent::Backspace => {
+                    current_buffer.pop();
+                }
+                keyboard_hook::HookEvent::Clear => {
+                    current_buffer.clear();
+                }
             }
-            // TODO: Handle form-based snippets by emitting event to frontend
-            return true; // Still matched, block keystroke
+            
+            // Clone buffer and release lock before evaluating triggers
+            let buffer_content = current_buffer.clone();
+            drop(current_buffer);
+            
+            let mut eng = engine.write();
+            if let Some(result) = eng.process_buffer(&buffer_content) {
+                if !result.has_form {
+                    if let Err(e) = eng.execute_expansion(&result) {
+                        log::error!("Failed to execute expansion: {}", e);
+                    } else {
+                        // Success! Clear buffer
+                        shared_buffer.write().clear();
+                    }
+                }
+                // TODO: Handle form-based snippets by emitting event to frontend
+            }
         }
-        false // No trigger matched
     });
+    
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -1149,15 +1109,19 @@ pub fn run() {
     // Initialize trigger engine
     let engine = Arc::new(RwLock::new(TriggerEngine::new(config.clone())));
     
-    // Set up trigger callback
-    setup_trigger_callback(engine.clone());
+    let shared_buffer = Arc::new(RwLock::new(String::with_capacity(256)));
+    
+    // Set up background worker
+    if let Err(e) = spawn_worker_thread(engine.clone(), shared_buffer.clone()) {
+        log::error!("Failed to spawn worker thread: {}", e);
+    }
     
     // Install keyboard hook
     if let Err(e) = keyboard_hook::install_hook() {
         log::error!("Failed to install keyboard hook: {}", e);
     }
     
-    let app_state = AppState { config, engine };
+    let app_state = AppState { config, engine, keystroke_buffer: shared_buffer };
     
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -1427,9 +1391,6 @@ pub fn replace_text(trigger_len: usize, replacement: &str, method: InjectionMeth
     // Inject the replacement text
     inject_text(replacement, method)?;
     
-    // Update the keyboard buffer
-    keyboard_hook::remove_chars_from_buffer(trigger_len);
-    
     Ok(())
 }
 </file>
@@ -1622,7 +1583,6 @@ impl TriggerEngine {
     /// Execute the expansion
     pub fn execute_expansion(&self, result: &ExpansionResult) -> Result<(), String> {
         replace_text(result.trigger_len, &result.replacement, self.injection_method)?;
-        keyboard_hook::clear_buffer();
         log::info!("Expanded snippet: {}", result.snippet_id);
         Ok(())
     }
@@ -3114,6 +3074,37 @@ export default defineConfig(async () => ({
     },
   },
 }));
+</file>
+
+<file path="package.json">
+{
+  "name": "tauri-app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "repomix": "repomix"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-opener": "^2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "repomix": "^1.16.0",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4"
+  }
+}
 </file>
 
 </files>
