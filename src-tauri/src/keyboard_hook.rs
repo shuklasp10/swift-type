@@ -59,44 +59,51 @@ pub fn is_injecting() -> bool {
     IS_INJECTING.load(Ordering::SeqCst)
 }
 
-/// Convert virtual key code to character (simplified)
-fn vk_to_char(vk_code: u32, shift_pressed: bool) -> Option<char> {
-    match vk_code {
-        // Letters A-Z
-        0x41..=0x5A => {
-            let base = (vk_code - 0x41) as u8 + b'a';
-            Some(if shift_pressed { 
-                (base - 32) as char 
-            } else { 
-                base as char 
-            })
-        }
-        // Numbers 0-9
-        0x30..=0x39 => Some((vk_code as u8) as char),
-        // Numpad 0-9
-        0x60..=0x69 => Some((b'0' + (vk_code - 0x60) as u8) as char),
-        // Common punctuation
-        VK_SPACE => Some(' '),
-        0xBA => Some(if shift_pressed { ':' } else { ';' }),  // ; :
-        0xBB => Some(if shift_pressed { '+' } else { '=' }),  // = +
-        0xBC => Some(if shift_pressed { '<' } else { ',' }),  // , <
-        0xBD => Some(if shift_pressed { '_' } else { '-' }),  // - _
-        0xBE => Some(if shift_pressed { '>' } else { '.' }),  // . >
-        0xBF => Some(if shift_pressed { '?' } else { '/' }),  // / ?
-        0xC0 => Some(if shift_pressed { '~' } else { '`' }),  // ` ~
-        0xDB => Some(if shift_pressed { '{' } else { '[' }),  // [ {
-        0xDC => Some(if shift_pressed { '|' } else { '\\' }), // \ |
-        0xDD => Some(if shift_pressed { '}' } else { ']' }),  // ] }
-        0xDE => Some(if shift_pressed { '"' } else { '\'' }), // ' "
-        _ => None,
-    }
-}
+/// Convert virtual key code to character using current keyboard layout
+fn vk_to_char(vk_code: u32, scan_code: u32) -> Option<char> {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{GetKeyboardState, ToUnicode, GetAsyncKeyState};
+    
+    let mut keyboard_state = [0u8; 256];
+    let _ = unsafe { GetKeyboardState(&mut keyboard_state) };
 
-/// Check if shift key is pressed
-fn is_shift_pressed() -> bool {
-    use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
     const VK_SHIFT: i32 = 0x10;
-    unsafe { GetAsyncKeyState(VK_SHIFT) < 0 }
+    const VK_CONTROL: i32 = 0x11;
+    const VK_MENU: i32 = 0x12;
+    const VK_CAPITAL: i32 = 0x14;
+
+    unsafe {
+        // High bit for pressed state
+        keyboard_state[VK_SHIFT as usize] = if GetAsyncKeyState(VK_SHIFT) < 0 { 0x80 } else { 0 };
+        keyboard_state[VK_CONTROL as usize] = if GetAsyncKeyState(VK_CONTROL) < 0 { 0x80 } else { 0 };
+        keyboard_state[VK_MENU as usize] = if GetAsyncKeyState(VK_MENU) < 0 { 0x80 } else { 0 };
+        
+        // Low bit for toggled state (CapsLock)
+        let caps_state = GetAsyncKeyState(VK_CAPITAL);
+        keyboard_state[VK_CAPITAL as usize] = if (caps_state & 1) != 0 { 1 } else { 0 };
+    }
+
+    let mut buffer = [0u16; 4];
+    let result = unsafe {
+        ToUnicode(
+            vk_code,
+            scan_code,
+            Some(&keyboard_state),
+            &mut buffer,
+            0,
+        )
+    };
+
+    if result > 0 {
+        if let Ok(s) = String::from_utf16(&buffer[0..(result as usize)]) {
+            if let Some(ch) = s.chars().next() {
+                // Filter out non-printable / control characters
+                if !ch.is_control() {
+                    return Some(ch);
+                }
+            }
+        }
+    }
+    None
 }
 
 /// Low-level keyboard hook callback
@@ -135,7 +142,8 @@ unsafe extern "system" fn keyboard_hook_callback(
                     }
                 }
                 _ => {
-                    if let Some(ch) = vk_to_char(vk_code, is_shift_pressed()) {
+                    let scan_code = kbd_struct.scanCode;
+                    if let Some(ch) = vk_to_char(vk_code, scan_code) {
                         if let Some(sender) = HOOK_SENDER.get() {
                             let _ = sender.send(HookEvent::Char(ch));
                         }

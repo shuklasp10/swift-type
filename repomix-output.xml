@@ -674,977 +674,11 @@ fn create_default_config() -> Config {
 // Add dirs crate dependency - this will be added to Cargo.toml
 </file>
 
-<file path="src-tauri/src/keyboard_hook.rs">
-//! Keyboard Hook Module
-//! 
-//! Implements a global low-level keyboard hook using Windows API
-//! to capture keystrokes for text expansion functionality.
-
-use once_cell::sync::OnceCell;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::Sender;
-use parking_lot::Mutex;
-use once_cell::sync::Lazy;
-use windows::Win32::Foundation::{HINSTANCE, LPARAM, LRESULT, WPARAM};
-use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, SetWindowsHookExW, UnhookWindowsHookEx, 
-    HC_ACTION, HHOOK, KBDLLHOOKSTRUCT, WH_KEYBOARD_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
-    LLKHF_INJECTED, LLKHF_LOWER_IL_INJECTED,
-};
-
-/// Keyboard event sent to the worker thread
-#[derive(Debug, Clone, Copy)]
-pub enum HookEvent {
-    Char(char),
-    Backspace,
-    Clear,
-}
-
-/// Wrapper for HHOOK to make it Send + Sync safe
-struct SendHHOOK(HHOOK);
-unsafe impl Send for SendHHOOK {}
-unsafe impl Sync for SendHHOOK {}
-
-/// Global hook handle
-static HOOK_HANDLE: Lazy<Mutex<Option<SendHHOOK>>> = Lazy::new(|| Mutex::new(None));
-
-/// Global sender for passing keystrokes to the worker thread
-static HOOK_SENDER: OnceCell<Sender<HookEvent>> = OnceCell::new();
-
-/// Flag to indicate if we're currently injecting text (to avoid recursive hooks)
-static IS_INJECTING: AtomicBool = AtomicBool::new(false);
-
-/// Virtual key codes for printable characters
-const VK_BACK: u32 = 0x08;
-const VK_RETURN: u32 = 0x0D;
-const VK_SPACE: u32 = 0x20;
-const VK_TAB: u32 = 0x09;
-const VK_ESCAPE: u32 = 0x1B;
-
-/// Set the channel sender for keyboard events
-pub fn set_event_sender(sender: Sender<HookEvent>) -> Result<(), &'static str> {
-    HOOK_SENDER.set(sender).map_err(|_| "Sender already set")
-}
-
-/// Set the injecting flag to prevent hook recursion
-pub fn set_injecting(value: bool) {
-    IS_INJECTING.store(value, Ordering::SeqCst);
-}
-
-/// Check if we're currently injecting
-pub fn is_injecting() -> bool {
-    IS_INJECTING.load(Ordering::SeqCst)
-}
-
-/// Convert virtual key code to character (simplified)
-fn vk_to_char(vk_code: u32, shift_pressed: bool) -> Option<char> {
-    match vk_code {
-        // Letters A-Z
-        0x41..=0x5A => {
-            let base = (vk_code - 0x41) as u8 + b'a';
-            Some(if shift_pressed { 
-                (base - 32) as char 
-            } else { 
-                base as char 
-            })
-        }
-        // Numbers 0-9
-        0x30..=0x39 => Some((vk_code as u8) as char),
-        // Numpad 0-9
-        0x60..=0x69 => Some((b'0' + (vk_code - 0x60) as u8) as char),
-        // Common punctuation
-        VK_SPACE => Some(' '),
-        0xBA => Some(if shift_pressed { ':' } else { ';' }),  // ; :
-        0xBB => Some(if shift_pressed { '+' } else { '=' }),  // = +
-        0xBC => Some(if shift_pressed { '<' } else { ',' }),  // , <
-        0xBD => Some(if shift_pressed { '_' } else { '-' }),  // - _
-        0xBE => Some(if shift_pressed { '>' } else { '.' }),  // . >
-        0xBF => Some(if shift_pressed { '?' } else { '/' }),  // / ?
-        0xC0 => Some(if shift_pressed { '~' } else { '`' }),  // ` ~
-        0xDB => Some(if shift_pressed { '{' } else { '[' }),  // [ {
-        0xDC => Some(if shift_pressed { '|' } else { '\\' }), // \ |
-        0xDD => Some(if shift_pressed { '}' } else { ']' }),  // ] }
-        0xDE => Some(if shift_pressed { '"' } else { '\'' }), // ' "
-        _ => None,
-    }
-}
-
-/// Check if shift key is pressed
-fn is_shift_pressed() -> bool {
-    use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
-    const VK_SHIFT: i32 = 0x10;
-    unsafe { GetAsyncKeyState(VK_SHIFT) < 0 }
-}
-
-/// Low-level keyboard hook callback
-unsafe extern "system" fn keyboard_hook_callback(
-    n_code: i32,
-    w_param: WPARAM,
-    l_param: LPARAM,
-) -> LRESULT {
-    // If we're injecting, skip processing
-    if is_injecting() {
-        return CallNextHookEx(None, n_code, w_param, l_param);
-    }
-
-    if n_code == HC_ACTION as i32 {
-        let kbd_struct = &*(l_param.0 as *const KBDLLHOOKSTRUCT);
-        
-        // Skip injected keys to prevent infinite loops
-        let flags = kbd_struct.flags.0;
-        if (flags & LLKHF_INJECTED.0) != 0 || (flags & LLKHF_LOWER_IL_INJECTED.0) != 0 {
-            return CallNextHookEx(None, n_code, w_param, l_param);
-        }
-
-        let msg_type = w_param.0 as u32;
-        if msg_type == WM_KEYDOWN || msg_type == WM_SYSKEYDOWN {
-            let vk_code = kbd_struct.vkCode;
-            
-            match vk_code {
-                VK_BACK => {
-                    if let Some(sender) = HOOK_SENDER.get() {
-                        let _ = sender.send(HookEvent::Backspace);
-                    }
-                }
-                VK_RETURN | VK_ESCAPE | VK_TAB => {
-                    if let Some(sender) = HOOK_SENDER.get() {
-                        let _ = sender.send(HookEvent::Clear);
-                    }
-                }
-                _ => {
-                    if let Some(ch) = vk_to_char(vk_code, is_shift_pressed()) {
-                        if let Some(sender) = HOOK_SENDER.get() {
-                            let _ = sender.send(HookEvent::Char(ch));
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    // Always pass to the next hook. We never block keystrokes here to avoid deadlocks.
-    CallNextHookEx(None, n_code, w_param, l_param)
-}
-
-/// Install the keyboard hook
-pub fn install_hook() -> Result<(), String> {
-    let mut handle = HOOK_HANDLE.lock();
-    
-    if handle.is_some() {
-        return Err("Hook already installed".to_string());
-    }
-
-    unsafe {
-        let hook = SetWindowsHookExW(
-            WH_KEYBOARD_LL,
-            Some(keyboard_hook_callback),
-            HINSTANCE::default(),
-            0,
-        ).map_err(|e| format!("Failed to install hook: {:?}", e))?;
-        
-        *handle = Some(SendHHOOK(hook));
-    }
-    
-    log::info!("Keyboard hook installed successfully");
-    Ok(())
-}
-
-/// Uninstall the keyboard hook
-#[allow(dead_code)]
-pub fn uninstall_hook() -> Result<(), String> {
-    let mut handle = HOOK_HANDLE.lock();
-    
-    if let Some(SendHHOOK(hook)) = handle.take() {
-        unsafe {
-            UnhookWindowsHookEx(hook)
-                .map_err(|e| format!("Failed to uninstall hook: {:?}", e))?;
-        }
-        log::info!("Keyboard hook uninstalled");
-    }
-    
-    Ok(())
-}
-
-/// Check if hook is installed
-pub fn is_hook_installed() -> bool {
-    HOOK_HANDLE.lock().is_some()
-}
-</file>
-
-<file path="src-tauri/src/lib.rs">
-//! SwiftType - A Modern Text Expander
-//! 
-//! Main library entry point that wires up the Tauri application
-//! with the text expansion engine.
-
-mod keyboard_hook;
-mod text_injector;
-mod config;
-mod trigger_engine;
-
-use std::sync::mpsc;
-use std::thread;
-use std::sync::Arc;
-use parking_lot::RwLock;
-use tauri::{AppHandle, Manager, State};
-use serde::{Deserialize, Serialize};
-
-use config::{ConfigManager, Snippet, AppSettings};
-use trigger_engine::TriggerEngine;
-
-/// Application state shared across commands
-pub struct AppState {
-    config: Arc<RwLock<ConfigManager>>,
-    engine: Arc<RwLock<TriggerEngine>>,
-    keystroke_buffer: Arc<RwLock<String>>,
-}
-
-// ============================================================================
-// Tauri Commands - Snippets Management
-// ============================================================================
-
-/// Get all snippets
-#[tauri::command]
-fn get_snippets(state: State<AppState>) -> Vec<Snippet> {
-    state.config.read().snippets().to_vec()
-}
-
-/// Add a new snippet
-#[tauri::command]
-fn add_snippet(state: State<AppState>, snippet: Snippet) -> Result<(), String> {
-    let mut config = state.config.write();
-    config.add_snippet(snippet);
-    config.save_config()?;
-    Ok(())
-}
-
-/// Update an existing snippet
-#[tauri::command]
-fn update_snippet(state: State<AppState>, id: String, snippet: Snippet) -> Result<bool, String> {
-    let mut config = state.config.write();
-    let updated = config.update_snippet(&id, snippet);
-    if updated {
-        config.save_config()?;
-    }
-    Ok(updated)
-}
-
-/// Delete a snippet
-#[tauri::command]
-fn delete_snippet(state: State<AppState>, id: String) -> Result<bool, String> {
-    let mut config = state.config.write();
-    let deleted = config.remove_snippet(&id);
-    if deleted {
-        config.save_config()?;
-    }
-    Ok(deleted)
-}
-
-// ============================================================================
-// Tauri Commands - Settings
-// ============================================================================
-
-/// Get application settings
-#[tauri::command]
-fn get_settings(state: State<AppState>) -> AppSettings {
-    state.config.read().settings().clone()
-}
-
-/// Update application settings
-#[tauri::command]
-fn update_settings(state: State<AppState>, settings: AppSettings) -> Result<(), String> {
-    let mut config = state.config.write();
-    *config.settings_mut() = settings;
-    config.save_settings()?;
-    Ok(())
-}
-
-// ============================================================================
-// Tauri Commands - Engine Control
-// ============================================================================
-
-/// Get engine status
-#[tauri::command]
-fn get_engine_status(state: State<AppState>) -> EngineStatus {
-    let engine = state.engine.read();
-    EngineStatus {
-        enabled: engine.is_enabled(),
-        hook_installed: keyboard_hook::is_hook_installed(),
-    }
-}
-
-/// Toggle the text expansion engine
-#[tauri::command]
-fn toggle_engine(state: State<AppState>, enabled: bool) -> Result<(), String> {
-    let mut engine = state.engine.write();
-    engine.set_enabled(enabled);
-    
-    if enabled && !keyboard_hook::is_hook_installed() {
-        keyboard_hook::install_hook()?;
-    }
-    
-    Ok(())
-}
-
-/// Clear the keystroke buffer
-#[tauri::command]
-fn clear_buffer(state: State<AppState>) {
-    state.keystroke_buffer.write().clear();
-}
-
-/// Get current keystroke buffer (for debugging)
-#[tauri::command]
-fn get_buffer(state: State<AppState>) -> String {
-    state.keystroke_buffer.read().clone()
-}
-
-#[derive(Serialize)]
-struct EngineStatus {
-    enabled: bool,
-    hook_installed: bool,
-}
-
-// ============================================================================
-// Tauri Commands - Search
-// ============================================================================
-
-/// Search snippets by trigger or label
-#[tauri::command]
-fn search_snippets(state: State<AppState>, query: String) -> Vec<Snippet> {
-    let config = state.config.read();
-    let query_lower = query.to_lowercase();
-    
-    config.snippets()
-        .iter()
-        .filter(|s| {
-            if let Some(ref trigger) = s.trigger {
-                if trigger.to_lowercase().contains(&query_lower) {
-                    return true;
-                }
-            }
-            if let Some(ref label) = s.label {
-                if label.to_lowercase().contains(&query_lower) {
-                    return true;
-                }
-            }
-            s.replace.to_lowercase().contains(&query_lower)
-        })
-        .cloned()
-        .collect()
-}
-
-// ============================================================================
-// Application Setup
-// ============================================================================
-
-fn spawn_worker_thread(
-    engine: Arc<RwLock<TriggerEngine>>,
-    shared_buffer: Arc<RwLock<String>>,
-) -> Result<(), &'static str> {
-    let (tx, rx) = mpsc::channel();
-    
-    keyboard_hook::set_event_sender(tx)?;
-    
-    thread::spawn(move || {
-        for event in rx {
-            let mut current_buffer = shared_buffer.write();
-            
-            match event {
-                keyboard_hook::HookEvent::Char(c) => {
-                    current_buffer.push(c);
-                    // Prevent buffer from growing unbounded
-                    if current_buffer.len() > 256 {
-                        let drain_count = current_buffer.len() - 128;
-                        current_buffer.drain(..drain_count);
-                    }
-                }
-                keyboard_hook::HookEvent::Backspace => {
-                    current_buffer.pop();
-                }
-                keyboard_hook::HookEvent::Clear => {
-                    current_buffer.clear();
-                }
-            }
-            
-            // Clone buffer and release lock before evaluating triggers
-            let buffer_content = current_buffer.clone();
-            drop(current_buffer);
-            
-            let mut eng = engine.write();
-            if let Some(result) = eng.process_buffer(&buffer_content) {
-                if !result.has_form {
-                    if let Err(e) = eng.execute_expansion(&result) {
-                        log::error!("Failed to execute expansion: {}", e);
-                    } else {
-                        // Success! Clear buffer
-                        shared_buffer.write().clear();
-                    }
-                }
-                // TODO: Handle form-based snippets by emitting event to frontend
-            }
-        }
-    });
-    
-    Ok(())
-}
-
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
-    // Initialize logger
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
-        .init();
-    
-    log::info!("Starting SwiftType...");
-    
-    // Initialize configuration
-    let config = match ConfigManager::new() {
-        Ok(cfg) => Arc::new(RwLock::new(cfg)),
-        Err(e) => {
-            log::error!("Failed to initialize config: {}", e);
-            eprintln!("Failed to initialize config: {}", e);
-            return;
-        }
-    };
-    
-    // Initialize trigger engine
-    let engine = Arc::new(RwLock::new(TriggerEngine::new(config.clone())));
-    
-    let shared_buffer = Arc::new(RwLock::new(String::with_capacity(256)));
-    
-    // Set up background worker
-    if let Err(e) = spawn_worker_thread(engine.clone(), shared_buffer.clone()) {
-        log::error!("Failed to spawn worker thread: {}", e);
-    }
-    
-    // Install keyboard hook
-    if let Err(e) = keyboard_hook::install_hook() {
-        log::error!("Failed to install keyboard hook: {}", e);
-    }
-    
-    let app_state = AppState { config, engine, keystroke_buffer: shared_buffer };
-    
-    tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
-        .manage(app_state)
-        .invoke_handler(tauri::generate_handler![
-            // Snippets
-            get_snippets,
-            add_snippet,
-            update_snippet,
-            delete_snippet,
-            search_snippets,
-            // Settings
-            get_settings,
-            update_settings,
-            // Engine
-            get_engine_status,
-            toggle_engine,
-            clear_buffer,
-            get_buffer,
-        ])
-        .on_window_event(|window, event| {
-            // Handle window close - minimize to tray instead
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                window.hide().unwrap();
-                api.prevent_close();
-            }
-        })
-        .run(tauri::generate_context!())
-        .expect("error while running SwiftType");
-}
-</file>
-
 <file path="src-tauri/src/main.rs">
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
     swifttype_lib::run()
-}
-</file>
-
-<file path="src-tauri/src/text_injector.rs">
-//! Text Injector Module
-//! 
-//! Handles injecting replacement text via simulated keystrokes or clipboard.
-
-use windows::Win32::UI::Input::KeyboardAndMouse::{
-    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, 
-    KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, KEYEVENTF_UNICODE,
-    VK_BACK, VK_CONTROL, VIRTUAL_KEY,
-};
-
-use crate::keyboard_hook;
-
-/// Injection method
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum InjectionMethod {
-    /// Simulate keystrokes (default)
-    Keystrokes,
-    /// Use clipboard paste (faster for long text)
-    Clipboard,
-    /// Automatically choose based on text length
-    Auto,
-}
-
-impl Default for InjectionMethod {
-    fn default() -> Self {
-        InjectionMethod::Auto
-    }
-}
-
-/// Threshold for switching to clipboard method in auto mode
-const CLIPBOARD_THRESHOLD: usize = 32;
-
-/// Send a single virtual key press
-fn send_key(vk: VIRTUAL_KEY, key_up: bool) {
-    let flags = if key_up { KEYEVENTF_KEYUP } else { KEYBD_EVENT_FLAGS::default() };
-    
-    let input = INPUT {
-        r#type: INPUT_KEYBOARD,
-        Anonymous: INPUT_0 {
-            ki: KEYBDINPUT {
-                wVk: vk,
-                wScan: 0,
-                dwFlags: flags,
-                time: 0,
-                dwExtraInfo: 0,
-            },
-        },
-    };
-    
-    unsafe {
-        SendInput(&[input], std::mem::size_of::<INPUT>() as i32);
-    }
-}
-
-/// Send a Unicode character
-fn send_unicode_char(ch: char) {
-    let scan_code = ch as u16;
-    
-    // Key down
-    let input_down = INPUT {
-        r#type: INPUT_KEYBOARD,
-        Anonymous: INPUT_0 {
-            ki: KEYBDINPUT {
-                wVk: VIRTUAL_KEY(0),
-                wScan: scan_code,
-                dwFlags: KEYEVENTF_UNICODE,
-                time: 0,
-                dwExtraInfo: 0,
-            },
-        },
-    };
-    
-    // Key up
-    let input_up = INPUT {
-        r#type: INPUT_KEYBOARD,
-        Anonymous: INPUT_0 {
-            ki: KEYBDINPUT {
-                wVk: VIRTUAL_KEY(0),
-                wScan: scan_code,
-                dwFlags: KEYEVENTF_UNICODE | KEYEVENTF_KEYUP,
-                time: 0,
-                dwExtraInfo: 0,
-            },
-        },
-    };
-    
-    unsafe {
-        SendInput(&[input_down, input_up], std::mem::size_of::<INPUT>() as i32);
-    }
-}
-
-/// Send multiple backspace key presses
-pub fn send_backspaces(count: usize) {
-    keyboard_hook::set_injecting(true);
-    
-    for _ in 0..count {
-        send_key(VK_BACK, false);
-        send_key(VK_BACK, true);
-        // Small delay to ensure keys are processed
-        std::thread::sleep(std::time::Duration::from_micros(100));
-    }
-    
-    keyboard_hook::set_injecting(false);
-}
-
-/// Inject text using keystrokes
-fn inject_via_keystrokes(text: &str) {
-    keyboard_hook::set_injecting(true);
-    
-    for ch in text.chars() {
-        send_unicode_char(ch);
-        // Small delay between characters for reliability
-        std::thread::sleep(std::time::Duration::from_micros(50));
-    }
-    
-    keyboard_hook::set_injecting(false);
-}
-
-/// Inject text using clipboard
-fn inject_via_clipboard(text: &str) -> Result<(), String> {
-    use windows::Win32::System::DataExchange::{
-        OpenClipboard, CloseClipboard, EmptyClipboard, SetClipboardData, GetClipboardData,
-    };
-    use windows::Win32::System::Memory::{
-        GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE,
-    };
-    use windows::Win32::Foundation::HWND;
-    
-    keyboard_hook::set_injecting(true);
-    
-    let result = unsafe {
-        // Open clipboard
-        OpenClipboard(HWND::default())
-            .map_err(|e| format!("Failed to open clipboard: {:?}", e))?;
-        
-        // Save current clipboard content (optional, for restore)
-        let _old_data = GetClipboardData(13); // CF_UNICODETEXT
-        
-        // Empty clipboard
-        if let Err(e) = EmptyClipboard() {
-            let _ = CloseClipboard();
-            return Err(format!("Failed to empty clipboard: {:?}", e));
-        }
-        
-        // Convert text to UTF-16
-        let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
-        let size = wide.len() * 2;
-        
-        // Allocate global memory
-        let hglobal = match GlobalAlloc(GMEM_MOVEABLE, size) {
-            Ok(h) => h,
-            Err(e) => {
-                let _ = CloseClipboard();
-                return Err(format!("Failed to allocate memory: {:?}", e));
-            }
-        };
-        
-        // Lock and copy data
-        let ptr = GlobalLock(hglobal);
-        if ptr.is_null() {
-            let _ = CloseClipboard();
-            return Err("Failed to lock memory".to_string());
-        }
-        
-        std::ptr::copy_nonoverlapping(wide.as_ptr(), ptr as *mut u16, wide.len());
-        let _ = GlobalUnlock(hglobal);
-        
-        // Set clipboard data (CF_UNICODETEXT = 13)
-        if let Err(e) = SetClipboardData(13, windows::Win32::Foundation::HANDLE(hglobal.0)) {
-            let _ = CloseClipboard();
-            return Err(format!("Failed to set clipboard data: {:?}", e));
-        }
-        
-        // Close clipboard
-        let _ = CloseClipboard();
-        
-        Ok(())
-    };
-    
-    // Simulate Ctrl+V
-    if result.is_ok() {
-        send_key(VK_CONTROL, false);
-        send_key(VIRTUAL_KEY(0x56), false); // V key
-        send_key(VIRTUAL_KEY(0x56), true);
-        send_key(VK_CONTROL, true);
-        
-        // Small delay for paste to complete
-        std::thread::sleep(std::time::Duration::from_millis(10));
-    }
-    
-    keyboard_hook::set_injecting(false);
-    result
-}
-
-/// Inject replacement text using the specified method
-pub fn inject_text(text: &str, method: InjectionMethod) -> Result<(), String> {
-    let actual_method = match method {
-        InjectionMethod::Auto => {
-            if text.len() > CLIPBOARD_THRESHOLD {
-                InjectionMethod::Clipboard
-            } else {
-                InjectionMethod::Keystrokes
-            }
-        }
-        other => other,
-    };
-    
-    match actual_method {
-        InjectionMethod::Keystrokes => {
-            inject_via_keystrokes(text);
-            Ok(())
-        }
-        InjectionMethod::Clipboard => inject_via_clipboard(text),
-        InjectionMethod::Auto => unreachable!(),
-    }
-}
-
-/// Perform a text replacement: remove trigger chars and inject replacement
-pub fn replace_text(trigger_len: usize, replacement: &str, method: InjectionMethod) -> Result<(), String> {
-    // First, send backspaces to remove the trigger
-    send_backspaces(trigger_len);
-    
-    // Small delay before injecting replacement
-    std::thread::sleep(std::time::Duration::from_millis(5));
-    
-    // Inject the replacement text
-    inject_text(replacement, method)?;
-    
-    Ok(())
-}
-</file>
-
-<file path="src-tauri/src/trigger_engine.rs">
-//! Trigger Engine Module
-//! 
-//! Handles trigger detection, variable expansion, and text replacement coordination.
-
-use chrono::Local;
-use regex::Regex;
-use std::collections::HashMap;
-use std::sync::Arc;
-use parking_lot::RwLock;
-
-use crate::config::{ConfigManager, Snippet};
-use crate::text_injector::{InjectionMethod, replace_text};
-use crate::keyboard_hook;
-
-/// Compiled regex cache
-pub struct TriggerEngine {
-    config: Arc<RwLock<ConfigManager>>,
-    regex_cache: HashMap<String, Regex>,
-    injection_method: InjectionMethod,
-    enabled: bool,
-}
-
-impl TriggerEngine {
-    /// Create a new trigger engine
-    pub fn new(config: Arc<RwLock<ConfigManager>>) -> Self {
-        let injection_method = {
-            let cfg = config.read();
-            match cfg.settings().injection_method.as_str() {
-                "keystrokes" => InjectionMethod::Keystrokes,
-                "clipboard" => InjectionMethod::Clipboard,
-                _ => InjectionMethod::Auto,
-            }
-        };
-        
-        Self {
-            config,
-            regex_cache: HashMap::new(),
-            injection_method,
-            enabled: true,
-        }
-    }
-    
-    /// Enable or disable the engine
-    pub fn set_enabled(&mut self, enabled: bool) {
-        self.enabled = enabled;
-    }
-    
-    /// Check if engine is enabled
-    pub fn is_enabled(&self) -> bool {
-        self.enabled
-    }
-    
-    /// Set injection method
-    pub fn set_injection_method(&mut self, method: InjectionMethod) {
-        self.injection_method = method;
-    }
-    
-    /// Process a keystroke buffer and check for triggers
-    pub fn process_buffer(&mut self, buffer: &str) -> Option<ExpansionResult> {
-        if !self.enabled {
-            return None;
-        }
-        
-        // Collect matching info first to avoid borrow issues
-        let match_info: Option<(Option<(String, usize)>, Option<(String, String, String, bool)>)> = {
-            let config = self.config.read();
-            
-            for snippet in config.snippets() {
-                // Check exact trigger
-                if let Some(ref trigger) = snippet.trigger {
-                    if buffer.ends_with(trigger) {
-                        return Some(ExpansionResult {
-                            trigger_len: trigger.len(),
-                            replacement: self.expand_variables(&snippet.replace),
-                            snippet_id: snippet.id.clone(),
-                            has_form: snippet.form_fields.is_some(),
-                        });
-                    }
-                }
-                
-                // Check regex trigger - collect data for later processing
-                if let Some(ref regex_pattern) = snippet.regex {
-                    // Clone what we need to check regex outside the config borrow
-                    let pattern = regex_pattern.clone();
-                    let replace_text = snippet.replace.clone();
-                    let snip_id = snippet.id.clone();
-                    let has_form = snippet.form_fields.is_some();
-                    drop(config);
-                    
-                    if let Some(result) = self.check_regex_trigger(buffer, &pattern, &replace_text, &snip_id, has_form) {
-                        return Some(result);
-                    }
-                    
-                    // Re-acquire config for next iteration
-                    // But since we found no match, continue checking
-                    // For simplicity, just return None here and let caller retry
-                    return None;
-                }
-            }
-            None
-        };
-        
-        None
-    }
-    
-    /// Check for regex trigger match
-    fn check_regex_trigger(
-        &mut self, 
-        buffer: &str, 
-        pattern: &str, 
-        replace_text: &str,
-        snippet_id: &str,
-        has_form: bool,
-    ) -> Option<ExpansionResult> {
-        // Get or compile regex
-        let regex = if let Some(cached) = self.regex_cache.get(pattern) {
-            cached
-        } else {
-            match Regex::new(pattern) {
-                Ok(re) => {
-                    self.regex_cache.insert(pattern.to_string(), re);
-                    self.regex_cache.get(pattern).unwrap()
-                }
-                Err(e) => {
-                    log::error!("Invalid regex pattern '{}': {}", pattern, e);
-                    return None;
-                }
-            }
-        };
-        
-        // Check if buffer ends with a match
-        if let Some(mat) = regex.find(buffer) {
-            if mat.end() == buffer.len() {
-                let matched_text = mat.as_str();
-                let replacement = regex.replace(matched_text, replace_text);
-                let replacement = self.expand_variables(&replacement);
-                
-                return Some(ExpansionResult {
-                    trigger_len: matched_text.len(),
-                    replacement,
-                    snippet_id: snippet_id.to_string(),
-                    has_form,
-                });
-            }
-        }
-        
-        None
-    }
-    
-    /// Expand built-in variables in replacement text
-    fn expand_variables(&self, text: &str) -> String {
-        let now = Local::now();
-        
-        let mut result = text.to_string();
-        
-        // Date/time variables
-        result = result.replace("{{date}}", &now.format("%Y-%m-%d").to_string());
-        result = result.replace("{{time}}", &now.format("%H:%M:%S").to_string());
-        result = result.replace("{{datetime}}", &now.format("%Y-%m-%d %H:%M:%S").to_string());
-        result = result.replace("{{year}}", &now.format("%Y").to_string());
-        result = result.replace("{{month}}", &now.format("%m").to_string());
-        result = result.replace("{{day}}", &now.format("%d").to_string());
-        result = result.replace("{{hour}}", &now.format("%H").to_string());
-        result = result.replace("{{minute}}", &now.format("%M").to_string());
-        result = result.replace("{{second}}", &now.format("%S").to_string());
-        
-        // Day names
-        result = result.replace("{{weekday}}", &now.format("%A").to_string());
-        result = result.replace("{{weekday_short}}", &now.format("%a").to_string());
-        result = result.replace("{{month_name}}", &now.format("%B").to_string());
-        result = result.replace("{{month_short}}", &now.format("%b").to_string());
-        
-        // Clipboard (if requested)
-        if result.contains("{{clipboard}}") {
-            if let Some(clip_text) = get_clipboard_text() {
-                result = result.replace("{{clipboard}}", &clip_text);
-            } else {
-                result = result.replace("{{clipboard}}", "");
-            }
-        }
-        
-        result
-    }
-    
-    /// Execute the expansion
-    pub fn execute_expansion(&self, result: &ExpansionResult) -> Result<(), String> {
-        replace_text(result.trigger_len, &result.replacement, self.injection_method)?;
-        log::info!("Expanded snippet: {}", result.snippet_id);
-        Ok(())
-    }
-}
-
-/// Result of a trigger match
-#[derive(Debug, Clone)]
-pub struct ExpansionResult {
-    /// Number of characters to remove (trigger length)
-    pub trigger_len: usize,
-    /// The replacement text (with variables expanded)
-    pub replacement: String,
-    /// ID of the matched snippet
-    pub snippet_id: String,
-    /// Whether this snippet has form fields
-    pub has_form: bool,
-}
-
-/// Get text from clipboard
-fn get_clipboard_text() -> Option<String> {
-    use windows::Win32::System::DataExchange::{OpenClipboard, CloseClipboard, GetClipboardData};
-    use windows::Win32::System::Memory::{GlobalLock, GlobalUnlock};
-    use windows::Win32::Foundation::{HWND, HGLOBAL};
-    
-    unsafe {
-        if OpenClipboard(HWND::default()).is_err() {
-            return None;
-        }
-        
-        // CF_UNICODETEXT = 13
-        let handle = match GetClipboardData(13) {
-            Ok(h) => h,
-            Err(_) => {
-                let _ = CloseClipboard();
-                return None;
-            }
-        };
-        
-        // Convert HANDLE to HGLOBAL
-        let hglobal = HGLOBAL(handle.0);
-        
-        let ptr = GlobalLock(hglobal);
-        if ptr.is_null() {
-            let _ = CloseClipboard();
-            return None;
-        }
-        
-        // Read UTF-16 string
-        let mut len = 0;
-        let wptr = ptr as *const u16;
-        while *wptr.add(len) != 0 {
-            len += 1;
-        }
-        
-        let slice = std::slice::from_raw_parts(wptr, len);
-        let text = String::from_utf16_lossy(slice);
-        
-        let _ = GlobalUnlock(hglobal);
-        let _ = CloseClipboard();
-        
-        Some(text)
-    }
 }
 </file>
 
@@ -3104,6 +2138,980 @@ export default defineConfig(async () => ({
     "typescript": "~5.8.3",
     "vite": "^7.0.4"
   }
+}
+</file>
+
+<file path="src-tauri/src/keyboard_hook.rs">
+//! Keyboard Hook Module
+//! 
+//! Implements a global low-level keyboard hook using Windows API
+//! to capture keystrokes for text expansion functionality.
+
+use once_cell::sync::OnceCell;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::Sender;
+use parking_lot::Mutex;
+use once_cell::sync::Lazy;
+use windows::Win32::Foundation::{HINSTANCE, LPARAM, LRESULT, WPARAM};
+use windows::Win32::UI::WindowsAndMessaging::{
+    CallNextHookEx, SetWindowsHookExW, UnhookWindowsHookEx, 
+    HC_ACTION, HHOOK, KBDLLHOOKSTRUCT, WH_KEYBOARD_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
+    LLKHF_INJECTED, LLKHF_LOWER_IL_INJECTED,
+};
+
+/// Keyboard event sent to the worker thread
+#[derive(Debug, Clone, Copy)]
+pub enum HookEvent {
+    Char(char),
+    Backspace,
+    Clear,
+}
+
+/// Wrapper for HHOOK to make it Send + Sync safe
+struct SendHHOOK(HHOOK);
+unsafe impl Send for SendHHOOK {}
+unsafe impl Sync for SendHHOOK {}
+
+/// Global hook handle
+static HOOK_HANDLE: Lazy<Mutex<Option<SendHHOOK>>> = Lazy::new(|| Mutex::new(None));
+
+/// Global sender for passing keystrokes to the worker thread
+static HOOK_SENDER: OnceCell<Sender<HookEvent>> = OnceCell::new();
+
+/// Flag to indicate if we're currently injecting text (to avoid recursive hooks)
+static IS_INJECTING: AtomicBool = AtomicBool::new(false);
+
+/// Virtual key codes for printable characters
+const VK_BACK: u32 = 0x08;
+const VK_RETURN: u32 = 0x0D;
+const VK_SPACE: u32 = 0x20;
+const VK_TAB: u32 = 0x09;
+const VK_ESCAPE: u32 = 0x1B;
+
+/// Set the channel sender for keyboard events
+pub fn set_event_sender(sender: Sender<HookEvent>) -> Result<(), &'static str> {
+    HOOK_SENDER.set(sender).map_err(|_| "Sender already set")
+}
+
+/// Set the injecting flag to prevent hook recursion
+pub fn set_injecting(value: bool) {
+    IS_INJECTING.store(value, Ordering::SeqCst);
+}
+
+/// Check if we're currently injecting
+pub fn is_injecting() -> bool {
+    IS_INJECTING.load(Ordering::SeqCst)
+}
+
+/// Convert virtual key code to character using current keyboard layout
+fn vk_to_char(vk_code: u32, scan_code: u32) -> Option<char> {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{GetKeyboardState, ToUnicode, GetAsyncKeyState};
+    
+    let mut keyboard_state = [0u8; 256];
+    let _ = unsafe { GetKeyboardState(&mut keyboard_state) };
+
+    const VK_SHIFT: i32 = 0x10;
+    const VK_CONTROL: i32 = 0x11;
+    const VK_MENU: i32 = 0x12;
+    const VK_CAPITAL: i32 = 0x14;
+
+    unsafe {
+        // High bit for pressed state
+        keyboard_state[VK_SHIFT as usize] = if GetAsyncKeyState(VK_SHIFT) < 0 { 0x80 } else { 0 };
+        keyboard_state[VK_CONTROL as usize] = if GetAsyncKeyState(VK_CONTROL) < 0 { 0x80 } else { 0 };
+        keyboard_state[VK_MENU as usize] = if GetAsyncKeyState(VK_MENU) < 0 { 0x80 } else { 0 };
+        
+        // Low bit for toggled state (CapsLock)
+        let caps_state = GetAsyncKeyState(VK_CAPITAL);
+        keyboard_state[VK_CAPITAL as usize] = if (caps_state & 1) != 0 { 1 } else { 0 };
+    }
+
+    let mut buffer = [0u16; 4];
+    let result = unsafe {
+        ToUnicode(
+            vk_code,
+            scan_code,
+            Some(&keyboard_state),
+            &mut buffer,
+            0,
+        )
+    };
+
+    if result > 0 {
+        if let Ok(s) = String::from_utf16(&buffer[0..(result as usize)]) {
+            if let Some(ch) = s.chars().next() {
+                // Filter out non-printable / control characters
+                if !ch.is_control() {
+                    return Some(ch);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Low-level keyboard hook callback
+unsafe extern "system" fn keyboard_hook_callback(
+    n_code: i32,
+    w_param: WPARAM,
+    l_param: LPARAM,
+) -> LRESULT {
+    // If we're injecting, skip processing
+    if is_injecting() {
+        return CallNextHookEx(None, n_code, w_param, l_param);
+    }
+
+    if n_code == HC_ACTION as i32 {
+        let kbd_struct = &*(l_param.0 as *const KBDLLHOOKSTRUCT);
+        
+        // Skip injected keys to prevent infinite loops
+        let flags = kbd_struct.flags.0;
+        if (flags & LLKHF_INJECTED.0) != 0 || (flags & LLKHF_LOWER_IL_INJECTED.0) != 0 {
+            return CallNextHookEx(None, n_code, w_param, l_param);
+        }
+
+        let msg_type = w_param.0 as u32;
+        if msg_type == WM_KEYDOWN || msg_type == WM_SYSKEYDOWN {
+            let vk_code = kbd_struct.vkCode;
+            
+            match vk_code {
+                VK_BACK => {
+                    if let Some(sender) = HOOK_SENDER.get() {
+                        let _ = sender.send(HookEvent::Backspace);
+                    }
+                }
+                VK_RETURN | VK_ESCAPE | VK_TAB => {
+                    if let Some(sender) = HOOK_SENDER.get() {
+                        let _ = sender.send(HookEvent::Clear);
+                    }
+                }
+                _ => {
+                    let scan_code = kbd_struct.scanCode;
+                    if let Some(ch) = vk_to_char(vk_code, scan_code) {
+                        if let Some(sender) = HOOK_SENDER.get() {
+                            let _ = sender.send(HookEvent::Char(ch));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Always pass to the next hook. We never block keystrokes here to avoid deadlocks.
+    CallNextHookEx(None, n_code, w_param, l_param)
+}
+
+/// Install the keyboard hook
+pub fn install_hook() -> Result<(), String> {
+    let mut handle = HOOK_HANDLE.lock();
+    
+    if handle.is_some() {
+        return Err("Hook already installed".to_string());
+    }
+
+    unsafe {
+        let hook = SetWindowsHookExW(
+            WH_KEYBOARD_LL,
+            Some(keyboard_hook_callback),
+            HINSTANCE::default(),
+            0,
+        ).map_err(|e| format!("Failed to install hook: {:?}", e))?;
+        
+        *handle = Some(SendHHOOK(hook));
+    }
+    
+    log::info!("Keyboard hook installed successfully");
+    Ok(())
+}
+
+/// Uninstall the keyboard hook
+#[allow(dead_code)]
+pub fn uninstall_hook() -> Result<(), String> {
+    let mut handle = HOOK_HANDLE.lock();
+    
+    if let Some(SendHHOOK(hook)) = handle.take() {
+        unsafe {
+            UnhookWindowsHookEx(hook)
+                .map_err(|e| format!("Failed to uninstall hook: {:?}", e))?;
+        }
+        log::info!("Keyboard hook uninstalled");
+    }
+    
+    Ok(())
+}
+
+/// Check if hook is installed
+pub fn is_hook_installed() -> bool {
+    HOOK_HANDLE.lock().is_some()
+}
+</file>
+
+<file path="src-tauri/src/lib.rs">
+//! SwiftType - A Modern Text Expander
+//! 
+//! Main library entry point that wires up the Tauri application
+//! with the text expansion engine.
+
+mod keyboard_hook;
+mod text_injector;
+mod config;
+mod trigger_engine;
+
+use std::sync::mpsc;
+use std::thread;
+use std::sync::Arc;
+use parking_lot::RwLock;
+use tauri::{AppHandle, Manager, State};
+use serde::{Deserialize, Serialize};
+
+use config::{ConfigManager, Snippet, AppSettings};
+use trigger_engine::TriggerEngine;
+
+/// Application state shared across commands
+pub struct AppState {
+    config: Arc<RwLock<ConfigManager>>,
+    engine: Arc<RwLock<TriggerEngine>>,
+    keystroke_buffer: Arc<RwLock<String>>,
+}
+
+// ============================================================================
+// Tauri Commands - Snippets Management
+// ============================================================================
+
+/// Get all snippets
+#[tauri::command]
+fn get_snippets(state: State<AppState>) -> Vec<Snippet> {
+    state.config.read().snippets().to_vec()
+}
+
+/// Add a new snippet
+#[tauri::command]
+fn add_snippet(state: State<AppState>, snippet: Snippet) -> Result<(), String> {
+    let mut config = state.config.write();
+    config.add_snippet(snippet);
+    config.save_config()?;
+    Ok(())
+}
+
+/// Update an existing snippet
+#[tauri::command]
+fn update_snippet(state: State<AppState>, id: String, snippet: Snippet) -> Result<bool, String> {
+    let mut config = state.config.write();
+    let updated = config.update_snippet(&id, snippet);
+    if updated {
+        config.save_config()?;
+    }
+    Ok(updated)
+}
+
+/// Delete a snippet
+#[tauri::command]
+fn delete_snippet(state: State<AppState>, id: String) -> Result<bool, String> {
+    let mut config = state.config.write();
+    let deleted = config.remove_snippet(&id);
+    if deleted {
+        config.save_config()?;
+    }
+    Ok(deleted)
+}
+
+// ============================================================================
+// Tauri Commands - Settings
+// ============================================================================
+
+/// Get application settings
+#[tauri::command]
+fn get_settings(state: State<AppState>) -> AppSettings {
+    state.config.read().settings().clone()
+}
+
+/// Update application settings
+#[tauri::command]
+fn update_settings(state: State<AppState>, settings: AppSettings) -> Result<(), String> {
+    let mut config = state.config.write();
+    *config.settings_mut() = settings;
+    config.save_settings()?;
+    Ok(())
+}
+
+// ============================================================================
+// Tauri Commands - Engine Control
+// ============================================================================
+
+/// Get engine status
+#[tauri::command]
+fn get_engine_status(state: State<AppState>) -> EngineStatus {
+    let engine = state.engine.read();
+    EngineStatus {
+        enabled: engine.is_enabled(),
+        hook_installed: keyboard_hook::is_hook_installed(),
+    }
+}
+
+/// Toggle the text expansion engine
+#[tauri::command]
+fn toggle_engine(state: State<AppState>, enabled: bool) -> Result<(), String> {
+    let mut engine = state.engine.write();
+    engine.set_enabled(enabled);
+    
+    if enabled && !keyboard_hook::is_hook_installed() {
+        keyboard_hook::install_hook()?;
+    }
+    
+    Ok(())
+}
+
+/// Clear the keystroke buffer
+#[tauri::command]
+fn clear_buffer(state: State<AppState>) {
+    state.keystroke_buffer.write().clear();
+}
+
+/// Get current keystroke buffer (for debugging)
+#[tauri::command]
+fn get_buffer(state: State<AppState>) -> String {
+    state.keystroke_buffer.read().clone()
+}
+
+#[derive(Serialize)]
+struct EngineStatus {
+    enabled: bool,
+    hook_installed: bool,
+}
+
+// ============================================================================
+// Tauri Commands - Search
+// ============================================================================
+
+/// Search snippets by trigger or label
+#[tauri::command]
+fn search_snippets(state: State<AppState>, query: String) -> Vec<Snippet> {
+    let config = state.config.read();
+    let query_lower = query.to_lowercase();
+    
+    config.snippets()
+        .iter()
+        .filter(|s| {
+            if let Some(ref trigger) = s.trigger {
+                if trigger.to_lowercase().contains(&query_lower) {
+                    return true;
+                }
+            }
+            if let Some(ref label) = s.label {
+                if label.to_lowercase().contains(&query_lower) {
+                    return true;
+                }
+            }
+            s.replace.to_lowercase().contains(&query_lower)
+        })
+        .cloned()
+        .collect()
+}
+
+// ============================================================================
+// Application Setup
+// ============================================================================
+
+fn spawn_worker_thread(
+    engine: Arc<RwLock<TriggerEngine>>,
+    shared_buffer: Arc<RwLock<String>>,
+) -> Result<(), &'static str> {
+    let (tx, rx) = mpsc::channel();
+    
+    keyboard_hook::set_event_sender(tx)?;
+    
+    thread::spawn(move || {
+        for event in rx {
+            let mut current_buffer = shared_buffer.write();
+            
+            match event {
+                keyboard_hook::HookEvent::Char(c) => {
+                    current_buffer.push(c);
+                    // Prevent buffer from growing unbounded
+                    if current_buffer.len() > 256 {
+                        let drain_count = current_buffer.len() - 128;
+                        current_buffer.drain(..drain_count);
+                    }
+                }
+                keyboard_hook::HookEvent::Backspace => {
+                    current_buffer.pop();
+                }
+                keyboard_hook::HookEvent::Clear => {
+                    current_buffer.clear();
+                }
+            }
+            
+            // Clone buffer and release lock before evaluating triggers
+            let buffer_content = current_buffer.clone();
+            drop(current_buffer);
+            
+            let mut eng = engine.write();
+            if let Some(result) = eng.process_buffer(&buffer_content) {
+                if !result.has_form {
+                    if let Err(e) = eng.execute_expansion(&result) {
+                        log::error!("Failed to execute expansion: {}", e);
+                    } else {
+                        // Success! Clear buffer
+                        shared_buffer.write().clear();
+                    }
+                }
+                // TODO: Handle form-based snippets by emitting event to frontend
+            }
+        }
+    });
+    
+    Ok(())
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    // Initialize logger
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+        .init();
+    
+    log::info!("Starting SwiftType...");
+    
+    // Initialize configuration
+    let config = match ConfigManager::new() {
+        Ok(cfg) => Arc::new(RwLock::new(cfg)),
+        Err(e) => {
+            log::error!("Failed to initialize config: {}", e);
+            eprintln!("Failed to initialize config: {}", e);
+            return;
+        }
+    };
+    
+    // Initialize trigger engine
+    let engine = Arc::new(RwLock::new(TriggerEngine::new(config.clone())));
+    
+    let shared_buffer = Arc::new(RwLock::new(String::with_capacity(256)));
+    
+    // Set up background worker
+    if let Err(e) = spawn_worker_thread(engine.clone(), shared_buffer.clone()) {
+        log::error!("Failed to spawn worker thread: {}", e);
+    }
+    
+    // Install keyboard hook
+    if let Err(e) = keyboard_hook::install_hook() {
+        log::error!("Failed to install keyboard hook: {}", e);
+    }
+    
+    let app_state = AppState { config, engine, keystroke_buffer: shared_buffer };
+    
+    tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
+        .manage(app_state)
+        .invoke_handler(tauri::generate_handler![
+            // Snippets
+            get_snippets,
+            add_snippet,
+            update_snippet,
+            delete_snippet,
+            search_snippets,
+            // Settings
+            get_settings,
+            update_settings,
+            // Engine
+            get_engine_status,
+            toggle_engine,
+            clear_buffer,
+            get_buffer,
+        ])
+        .on_window_event(|window, event| {
+            // Handle window close - minimize to tray instead
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                window.hide().unwrap();
+                api.prevent_close();
+            }
+        })
+        .run(tauri::generate_context!())
+        .expect("error while running SwiftType");
+}
+</file>
+
+<file path="src-tauri/src/text_injector.rs">
+//! Text Injector Module
+//! 
+//! Handles injecting replacement text via simulated keystrokes or clipboard.
+
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, 
+    KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, KEYEVENTF_UNICODE,
+    VK_BACK, VK_CONTROL, VIRTUAL_KEY,
+};
+
+use crate::keyboard_hook;
+
+/// Injection method
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum InjectionMethod {
+    /// Simulate keystrokes (default)
+    Keystrokes,
+    /// Use clipboard paste (faster for long text)
+    Clipboard,
+    /// Automatically choose based on text length
+    Auto,
+}
+
+impl Default for InjectionMethod {
+    fn default() -> Self {
+        InjectionMethod::Auto
+    }
+}
+
+/// Threshold for switching to clipboard method in auto mode
+const CLIPBOARD_THRESHOLD: usize = 32;
+
+/// Send a single virtual key press
+fn send_key(vk: VIRTUAL_KEY, key_up: bool) {
+    let flags = if key_up { KEYEVENTF_KEYUP } else { KEYBD_EVENT_FLAGS::default() };
+    
+    let input = INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: vk,
+                wScan: 0,
+                dwFlags: flags,
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    };
+    
+    unsafe {
+        SendInput(&[input], std::mem::size_of::<INPUT>() as i32);
+    }
+}
+
+/// Send a Unicode character
+fn send_unicode_char(ch: char) {
+    let scan_code = ch as u16;
+    
+    // Key down
+    let input_down = INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: VIRTUAL_KEY(0),
+                wScan: scan_code,
+                dwFlags: KEYEVENTF_UNICODE,
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    };
+    
+    // Key up
+    let input_up = INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: VIRTUAL_KEY(0),
+                wScan: scan_code,
+                dwFlags: KEYEVENTF_UNICODE | KEYEVENTF_KEYUP,
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    };
+    
+    unsafe {
+        SendInput(&[input_down, input_up], std::mem::size_of::<INPUT>() as i32);
+    }
+}
+
+/// Send multiple backspace key presses
+pub fn send_backspaces(count: usize) {
+    keyboard_hook::set_injecting(true);
+    
+    for _ in 0..count {
+        send_key(VK_BACK, false);
+        send_key(VK_BACK, true);
+        // Small delay to ensure keys are processed
+        std::thread::sleep(std::time::Duration::from_micros(100));
+    }
+    
+    keyboard_hook::set_injecting(false);
+}
+
+/// Inject text using keystrokes
+fn inject_via_keystrokes(text: &str) {
+    keyboard_hook::set_injecting(true);
+    
+    for ch in text.chars() {
+        send_unicode_char(ch);
+        // Small delay between characters for reliability
+        std::thread::sleep(std::time::Duration::from_micros(50));
+    }
+    
+    keyboard_hook::set_injecting(false);
+}
+
+/// Inject text using clipboard
+fn inject_via_clipboard(text: &str) -> Result<(), String> {
+    use windows::Win32::System::DataExchange::{
+        OpenClipboard, CloseClipboard, EmptyClipboard, SetClipboardData, GetClipboardData,
+    };
+    use windows::Win32::System::Memory::{
+        GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE,
+    };
+    use windows::Win32::Foundation::HWND;
+    
+    keyboard_hook::set_injecting(true);
+    
+    let result = unsafe {
+        // Open clipboard
+        OpenClipboard(HWND::default())
+            .map_err(|e| format!("Failed to open clipboard: {:?}", e))?;
+        
+        // Save current clipboard content (optional, for restore)
+        let _old_data = GetClipboardData(13); // CF_UNICODETEXT
+        
+        // Empty clipboard
+        if let Err(e) = EmptyClipboard() {
+            let _ = CloseClipboard();
+            return Err(format!("Failed to empty clipboard: {:?}", e));
+        }
+        
+        // Convert text to UTF-16
+        let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+        let size = wide.len() * 2;
+        
+        // Allocate global memory
+        let hglobal = match GlobalAlloc(GMEM_MOVEABLE, size) {
+            Ok(h) => h,
+            Err(e) => {
+                let _ = CloseClipboard();
+                return Err(format!("Failed to allocate memory: {:?}", e));
+            }
+        };
+        
+        // Lock and copy data
+        let ptr = GlobalLock(hglobal);
+        if ptr.is_null() {
+            let _ = CloseClipboard();
+            return Err("Failed to lock memory".to_string());
+        }
+        
+        std::ptr::copy_nonoverlapping(wide.as_ptr(), ptr as *mut u16, wide.len());
+        let _ = GlobalUnlock(hglobal);
+        
+        // Set clipboard data (CF_UNICODETEXT = 13)
+        if let Err(e) = SetClipboardData(13, windows::Win32::Foundation::HANDLE(hglobal.0)) {
+            let _ = CloseClipboard();
+            return Err(format!("Failed to set clipboard data: {:?}", e));
+        }
+        
+        // Close clipboard
+        let _ = CloseClipboard();
+        
+        Ok(())
+    };
+    
+    // Simulate Ctrl+V
+    if result.is_ok() {
+        send_key(VK_CONTROL, false);
+        send_key(VIRTUAL_KEY(0x56), false); // V key
+        send_key(VIRTUAL_KEY(0x56), true);
+        send_key(VK_CONTROL, true);
+        
+        // Small delay for paste to complete
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    
+    keyboard_hook::set_injecting(false);
+    result
+}
+
+/// Inject replacement text using the specified method
+pub fn inject_text(text: &str, method: InjectionMethod) -> Result<(), String> {
+    let actual_method = match method {
+        InjectionMethod::Auto => {
+            if text.len() > CLIPBOARD_THRESHOLD {
+                InjectionMethod::Clipboard
+            } else {
+                InjectionMethod::Keystrokes
+            }
+        }
+        other => other,
+    };
+    
+    match actual_method {
+        InjectionMethod::Keystrokes => {
+            inject_via_keystrokes(text);
+            Ok(())
+        }
+        InjectionMethod::Clipboard => inject_via_clipboard(text),
+        InjectionMethod::Auto => unreachable!(),
+    }
+}
+
+/// Perform a text replacement: remove trigger chars and inject replacement
+pub fn replace_text(trigger_len: usize, replacement: &str, method: InjectionMethod) -> Result<(), String> {
+    // First, send backspaces to remove the trigger
+    send_backspaces(trigger_len);
+    
+    // Small delay before injecting replacement
+    std::thread::sleep(std::time::Duration::from_millis(5));
+    
+    // Inject the replacement text
+    inject_text(replacement, method)?;
+    
+    Ok(())
+}
+</file>
+
+<file path="src-tauri/src/trigger_engine.rs">
+//! Trigger Engine Module
+//! 
+//! Handles trigger detection, variable expansion, and text replacement coordination.
+
+use chrono::Local;
+use regex::Regex;
+use std::collections::HashMap;
+use std::sync::Arc;
+use parking_lot::RwLock;
+
+use crate::config::{ConfigManager, Snippet};
+use crate::text_injector::{InjectionMethod, replace_text};
+use crate::keyboard_hook;
+
+/// Compiled regex cache
+pub struct TriggerEngine {
+    config: Arc<RwLock<ConfigManager>>,
+    regex_cache: HashMap<String, Regex>,
+    injection_method: InjectionMethod,
+    enabled: bool,
+}
+
+impl TriggerEngine {
+    /// Create a new trigger engine
+    pub fn new(config: Arc<RwLock<ConfigManager>>) -> Self {
+        let injection_method = {
+            let cfg = config.read();
+            match cfg.settings().injection_method.as_str() {
+                "keystrokes" => InjectionMethod::Keystrokes,
+                "clipboard" => InjectionMethod::Clipboard,
+                _ => InjectionMethod::Auto,
+            }
+        };
+        
+        Self {
+            config,
+            regex_cache: HashMap::new(),
+            injection_method,
+            enabled: true,
+        }
+    }
+    
+    /// Enable or disable the engine
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
+    
+    /// Check if engine is enabled
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+    
+    /// Set injection method
+    pub fn set_injection_method(&mut self, method: InjectionMethod) {
+        self.injection_method = method;
+    }
+    
+    /// Process a keystroke buffer and check for triggers
+    pub fn process_buffer(&mut self, buffer: &str) -> Option<ExpansionResult> {
+        if !self.enabled {
+            return None;
+        }
+        
+        // Collect matching info first to avoid borrow issues
+        let match_info: Option<(Option<(String, usize)>, Option<(String, String, String, bool)>)> = {
+            let config = self.config.read();
+            
+            for snippet in config.snippets() {
+                // Check exact trigger
+                if let Some(ref trigger) = snippet.trigger {
+                    if buffer.ends_with(trigger) {
+                        return Some(ExpansionResult {
+                            trigger_len: trigger.len(),
+                            replacement: self.expand_variables(&snippet.replace),
+                            snippet_id: snippet.id.clone(),
+                            has_form: snippet.form_fields.is_some(),
+                        });
+                    }
+                }
+                
+                // Check regex trigger - collect data for later processing
+                if let Some(ref regex_pattern) = snippet.regex {
+                    // Clone what we need to check regex outside the config borrow
+                    let pattern = regex_pattern.clone();
+                    let replace_text = snippet.replace.clone();
+                    let snip_id = snippet.id.clone();
+                    let has_form = snippet.form_fields.is_some();
+                    drop(config);
+                    
+                    if let Some(result) = self.check_regex_trigger(buffer, &pattern, &replace_text, &snip_id, has_form) {
+                        return Some(result);
+                    }
+                    
+                    // Re-acquire config for next iteration
+                    // But since we found no match, continue checking
+                    // For simplicity, just return None here and let caller retry
+                    return None;
+                }
+            }
+            None
+        };
+        
+        None
+    }
+    
+    /// Check for regex trigger match
+    fn check_regex_trigger(
+        &mut self, 
+        buffer: &str, 
+        pattern: &str, 
+        replace_text: &str,
+        snippet_id: &str,
+        has_form: bool,
+    ) -> Option<ExpansionResult> {
+        // Get or compile regex
+        let regex = if let Some(cached) = self.regex_cache.get(pattern) {
+            cached
+        } else {
+            match Regex::new(pattern) {
+                Ok(re) => {
+                    self.regex_cache.insert(pattern.to_string(), re);
+                    self.regex_cache.get(pattern).unwrap()
+                }
+                Err(e) => {
+                    log::error!("Invalid regex pattern '{}': {}", pattern, e);
+                    return None;
+                }
+            }
+        };
+        
+        // Check if buffer ends with a match
+        if let Some(mat) = regex.find(buffer) {
+            if mat.end() == buffer.len() {
+                let matched_text = mat.as_str();
+                let replacement = regex.replace(matched_text, replace_text);
+                let replacement = self.expand_variables(&replacement);
+                
+                return Some(ExpansionResult {
+                    trigger_len: matched_text.len(),
+                    replacement,
+                    snippet_id: snippet_id.to_string(),
+                    has_form,
+                });
+            }
+        }
+        
+        None
+    }
+    
+    /// Expand built-in variables in replacement text
+    fn expand_variables(&self, text: &str) -> String {
+        let now = Local::now();
+        
+        let mut result = text.to_string();
+        
+        // Date/time variables
+        result = result.replace("{{date}}", &now.format("%Y-%m-%d").to_string());
+        result = result.replace("{{time}}", &now.format("%H:%M:%S").to_string());
+        result = result.replace("{{datetime}}", &now.format("%Y-%m-%d %H:%M:%S").to_string());
+        result = result.replace("{{year}}", &now.format("%Y").to_string());
+        result = result.replace("{{month}}", &now.format("%m").to_string());
+        result = result.replace("{{day}}", &now.format("%d").to_string());
+        result = result.replace("{{hour}}", &now.format("%H").to_string());
+        result = result.replace("{{minute}}", &now.format("%M").to_string());
+        result = result.replace("{{second}}", &now.format("%S").to_string());
+        
+        // Day names
+        result = result.replace("{{weekday}}", &now.format("%A").to_string());
+        result = result.replace("{{weekday_short}}", &now.format("%a").to_string());
+        result = result.replace("{{month_name}}", &now.format("%B").to_string());
+        result = result.replace("{{month_short}}", &now.format("%b").to_string());
+        
+        // Clipboard (if requested)
+        if result.contains("{{clipboard}}") {
+            if let Some(clip_text) = get_clipboard_text() {
+                result = result.replace("{{clipboard}}", &clip_text);
+            } else {
+                result = result.replace("{{clipboard}}", "");
+            }
+        }
+        
+        result
+    }
+    
+    /// Execute the expansion
+    pub fn execute_expansion(&self, result: &ExpansionResult) -> Result<(), String> {
+        replace_text(result.trigger_len, &result.replacement, self.injection_method)?;
+        log::info!("Expanded snippet: {}", result.snippet_id);
+        Ok(())
+    }
+}
+
+/// Result of a trigger match
+#[derive(Debug, Clone)]
+pub struct ExpansionResult {
+    /// Number of characters to remove (trigger length)
+    pub trigger_len: usize,
+    /// The replacement text (with variables expanded)
+    pub replacement: String,
+    /// ID of the matched snippet
+    pub snippet_id: String,
+    /// Whether this snippet has form fields
+    pub has_form: bool,
+}
+
+/// Get text from clipboard
+fn get_clipboard_text() -> Option<String> {
+    use windows::Win32::System::DataExchange::{OpenClipboard, CloseClipboard, GetClipboardData};
+    use windows::Win32::System::Memory::{GlobalLock, GlobalUnlock};
+    use windows::Win32::Foundation::{HWND, HGLOBAL};
+    
+    unsafe {
+        if OpenClipboard(HWND::default()).is_err() {
+            return None;
+        }
+        
+        // CF_UNICODETEXT = 13
+        let handle = match GetClipboardData(13) {
+            Ok(h) => h,
+            Err(_) => {
+                let _ = CloseClipboard();
+                return None;
+            }
+        };
+        
+        // Convert HANDLE to HGLOBAL
+        let hglobal = HGLOBAL(handle.0);
+        
+        let ptr = GlobalLock(hglobal);
+        if ptr.is_null() {
+            let _ = CloseClipboard();
+            return None;
+        }
+        
+        // Read UTF-16 string
+        let mut len = 0;
+        let wptr = ptr as *const u16;
+        while *wptr.add(len) != 0 {
+            len += 1;
+        }
+        
+        let slice = std::slice::from_raw_parts(wptr, len);
+        let text = String::from_utf16_lossy(slice);
+        
+        let _ = GlobalUnlock(hglobal);
+        let _ = CloseClipboard();
+        
+        Some(text)
+    }
 }
 </file>
 
