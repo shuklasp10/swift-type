@@ -1,0 +1,3119 @@
+This file is a merged representation of a subset of the codebase, containing files not matching ignore patterns, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of a subset of the repository's contents that is considered the most important context.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching these patterns are excluded: src-tauri/target/**, dist/**, .vscode/**, package-lock.json, src-tauri/icons/**, src/assets/**, public/**
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+.gitignore
+index.html
+package.json
+README.md
+repomix.config.json
+src-tauri/.gitignore
+src-tauri/build.rs
+src-tauri/capabilities/default.json
+src-tauri/Cargo.toml
+src-tauri/src/config.rs
+src-tauri/src/keyboard_hook.rs
+src-tauri/src/lib.rs
+src-tauri/src/main.rs
+src-tauri/src/text_injector.rs
+src-tauri/src/trigger_engine.rs
+src-tauri/tauri.conf.json
+src/App.css
+src/App.tsx
+src/main.tsx
+src/vite-env.d.ts
+tsconfig.json
+tsconfig.node.json
+vite.config.ts
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="repomix.config.json">
+{
+  "output": {
+    "filePath": "repomix-output.xml",
+    "style": "xml",
+    "fileSummary": true,
+    "directoryStructure": true,
+    "removeComments": false,
+    "removeEmptyLines": false,
+    "topFilesLength": 5,
+    "showLineNumbers": false
+  },
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      "src-tauri/target/**",
+      "dist/**",
+      ".vscode/**",
+      "package-lock.json",
+      "src-tauri/icons/**",
+      "src/assets/**",
+      "public/**"
+    ]
+  },
+  "security": {
+    "enableSecurityCheck": true
+  }
+}
+</file>
+
+<file path=".gitignore">
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+</file>
+
+<file path="index.html">
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tauri + React + Typescript</title>
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+</file>
+
+<file path="package.json">
+{
+  "name": "tauri-app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "repomix": "repomix"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-opener": "^2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "repomix": "^1.16.0",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4"
+  }
+}
+</file>
+
+<file path="README.md">
+# SwiftType ⚡
+
+A modern, lightweight text expander for Windows. Alternative to Espanso with a beautiful UI.
+
+![Dark Theme](https://img.shields.io/badge/theme-dark-1a1a20)
+![Rust Backend](https://img.shields.io/badge/backend-Rust-orange)
+![React Frontend](https://img.shields.io/badge/frontend-React-61dafb)
+
+## Features
+
+- **🚀 Fast & Lightweight** - Built with Rust and Tauri
+- **✨ Modern UI** - Dark theme with glassmorphism effects
+- **⌨️ Global Hotkeys** - Works in any application
+- **📝 YAML Config** - Espanso-compatible format
+- **🔄 Variable Expansion** - Date, time, clipboard, and more
+- **🎯 Regex Triggers** - Advanced pattern matching
+
+## Installation
+
+### Prerequisites
+
+- [Rust](https://rustup.rs/) 1.70+
+- [Node.js](https://nodejs.org/) 18+
+- [VS Build Tools 2022](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022) with C++ workload
+
+### Build from Source
+
+```powershell
+git clone https://github.com/yourusername/SwiftType.git
+cd SwiftType
+npm install
+npm run tauri dev
+```
+
+## Usage
+
+### Creating Snippets
+
+1. Open SwiftType
+2. Click **New Snippet**
+3. Set a trigger (e.g., `:hello`)
+4. Set the replacement text
+5. Click **Create Snippet**
+
+### Typing Triggers
+
+Type your trigger in any application and it will automatically expand!
+
+```
+:hello → Hello, World!
+:date  → 2026-02-05
+:sig   → Your signature text
+```
+
+### Supported Variables
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `{{date}}` | Current date | 2026-02-05 |
+| `{{time}}` | Current time | 14:30:45 |
+| `{{datetime}}` | Date and time | 2026-02-05 14:30:45 |
+| `{{weekday}}` | Day name | Wednesday |
+| `{{clipboard}}` | Clipboard content | (pasted text) |
+| `{{year}}` | Current year | 2026 |
+| `{{month}}` | Current month | 02 |
+| `{{day}}` | Current day | 05 |
+
+## Configuration
+
+Snippets are stored in `%APPDATA%\swifttype\config.yml`:
+
+```yaml
+matches:
+  - trigger: ":hello"
+    replace: "Hello, World!"
+    label: "Greeting"
+    
+  - trigger: ":date"
+    replace: "{{date}}"
+    label: "Current Date"
+    
+  - trigger: ":sig"
+    replace: |
+      Best regards,
+      Your Name
+      your@email.com
+    label: "Email Signature"
+    
+  - regex: ":t(\\d+)"
+    replace: "Task #$1"
+    label: "Task Number"
+```
+
+## Development
+
+```powershell
+# Run in development mode
+npm run tauri dev
+
+# Build for production
+npm run tauri build
+```
+
+## Tech Stack
+
+- **Backend**: Rust with Tauri 2.x
+- **Frontend**: React 18 + TypeScript + Vite
+- **Styling**: Custom CSS with CSS variables
+- **Config**: serde_yaml for YAML parsing
+
+## License
+
+MIT License
+</file>
+
+<file path="src-tauri/.gitignore">
+# Generated by Cargo
+# will have compiled files and executables
+/target/
+
+# Generated by Tauri
+# will have schema files for capabilities auto-completion
+/gen/schemas
+</file>
+
+<file path="src-tauri/build.rs">
+fn main() {
+    tauri_build::build()
+}
+</file>
+
+<file path="src-tauri/capabilities/default.json">
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capability for the main window",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "opener:default"
+  ]
+}
+</file>
+
+<file path="src-tauri/Cargo.toml">
+[package]
+name = "swifttype"
+version = "0.1.0"
+description = "SwiftType - A Modern Text Expander"
+authors = ["SwiftType"]
+edition = "2021"
+
+[lib]
+name = "swifttype_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+regex = "1"
+chrono = "0.4"
+tokio = { version = "1", features = ["full"] }
+once_cell = "1.19"
+parking_lot = "0.12"
+log = "0.4"
+env_logger = "0.11"
+dirs = "5"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Threading",
+    "Win32_System_DataExchange",
+    "Win32_System_Memory",
+] }
+
+[profile.release]
+lto = true
+opt-level = "z"
+strip = true
+</file>
+
+<file path="src-tauri/src/config.rs">
+//! Configuration Module
+//! 
+//! Handles loading, saving, and managing snippets configuration.
+
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::PathBuf;
+
+/// A single snippet/match definition
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Snippet {
+    /// Unique identifier for this snippet
+    #[serde(default = "generate_id")]
+    pub id: String,
+    
+    /// The trigger text (e.g., ":hello")
+    #[serde(alias = "trigger")]
+    pub trigger: Option<String>,
+    
+    /// Regex trigger pattern (alternative to exact trigger)
+    #[serde(alias = "regex")]
+    pub regex: Option<String>,
+    
+    /// The replacement text
+    pub replace: String,
+    
+    /// Optional label for display in UI
+    #[serde(default)]
+    pub label: Option<String>,
+    
+    /// Word-based trigger (requires word boundary)
+    #[serde(default)]
+    pub word: bool,
+    
+    /// Force uppercase matching
+    #[serde(default)]
+    pub uppercase_style: Option<String>,
+    
+    /// Image path for image expansion
+    #[serde(default)]
+    pub image_path: Option<String>,
+    
+    /// Shell command to execute
+    #[serde(default)]
+    pub shell: Option<String>,
+    
+    /// Form fields for dynamic input
+    #[serde(default)]
+    pub form_fields: Option<Vec<FormField>>,
+    
+    /// App-specific filter
+    #[serde(default)]
+    pub filter_app: Option<String>,
+}
+
+/// Form field definition for dynamic snippets
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FormField {
+    pub name: String,
+    pub label: Option<String>,
+    #[serde(default)]
+    pub default: String,
+    #[serde(rename = "type", default = "default_field_type")]
+    pub field_type: String,
+    #[serde(default)]
+    pub choices: Option<Vec<String>>,
+}
+
+fn default_field_type() -> String {
+    "text".to_string()
+}
+
+fn generate_id() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    format!("snip_{}", timestamp)
+}
+
+/// Configuration file structure
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct Config {
+    /// List of snippets/matches
+    #[serde(default)]
+    pub matches: Vec<Snippet>,
+    
+    /// Global variables
+    #[serde(default)]
+    pub global_vars: HashMap<String, String>,
+}
+
+/// Application settings (stored separately from snippets)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppSettings {
+    /// Enable/disable the expander
+    pub enabled: bool,
+    
+    /// Injection method preference
+    pub injection_method: String, // "auto", "keystrokes", "clipboard"
+    
+    /// Search bar hotkey
+    pub search_hotkey: String,
+    
+    /// Backspace undo duration (ms)
+    pub undo_backspace_ms: u32,
+    
+    /// Start with Windows
+    pub start_with_windows: bool,
+    
+    /// Show in system tray
+    pub show_in_tray: bool,
+    
+    /// Theme preference
+    pub theme: String, // "dark", "light", "system"
+    
+    /// Toggle hotkey
+    pub toggle_hotkey: Option<String>,
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            injection_method: "auto".to_string(),
+            search_hotkey: "Alt+Space".to_string(),
+            undo_backspace_ms: 500,
+            start_with_windows: false,
+            show_in_tray: true,
+            theme: "dark".to_string(),
+            toggle_hotkey: None,
+        }
+    }
+}
+
+/// Configuration manager
+pub struct ConfigManager {
+    config: Config,
+    settings: AppSettings,
+    config_dir: PathBuf,
+}
+
+impl ConfigManager {
+    /// Create a new config manager
+    pub fn new() -> Result<Self, String> {
+        let config_dir = get_config_dir()?;
+        
+        // Ensure config directory exists
+        std::fs::create_dir_all(&config_dir)
+            .map_err(|e| format!("Failed to create config directory: {}", e))?;
+        
+        let mut manager = Self {
+            config: Config::default(),
+            settings: AppSettings::default(),
+            config_dir,
+        };
+        
+        // Load existing config if available
+        manager.load()?;
+        
+        Ok(manager)
+    }
+    
+    /// Get the config directory path
+    pub fn config_dir(&self) -> &PathBuf {
+        &self.config_dir
+    }
+    
+    /// Load configuration from disk
+    pub fn load(&mut self) -> Result<(), String> {
+        // Load snippets config
+        let config_path = self.config_dir.join("config.yml");
+        if config_path.exists() {
+            let content = std::fs::read_to_string(&config_path)
+                .map_err(|e| format!("Failed to read config file: {}", e))?;
+            self.config = serde_yaml::from_str(&content)
+                .map_err(|e| format!("Failed to parse config file: {}", e))?;
+        } else {
+            // Create default config
+            self.config = create_default_config();
+            self.save_config()?;
+        }
+        
+        // Load settings
+        let settings_path = self.config_dir.join("settings.json");
+        if settings_path.exists() {
+            let content = std::fs::read_to_string(&settings_path)
+                .map_err(|e| format!("Failed to read settings file: {}", e))?;
+            self.settings = serde_json::from_str(&content)
+                .map_err(|e| format!("Failed to parse settings file: {}", e))?;
+        } else {
+            self.save_settings()?;
+        }
+        
+        log::info!("Loaded {} snippets", self.config.matches.len());
+        Ok(())
+    }
+    
+    /// Save snippets config to disk
+    pub fn save_config(&self) -> Result<(), String> {
+        let config_path = self.config_dir.join("config.yml");
+        let content = serde_yaml::to_string(&self.config)
+            .map_err(|e| format!("Failed to serialize config: {}", e))?;
+        std::fs::write(&config_path, content)
+            .map_err(|e| format!("Failed to write config file: {}", e))?;
+        Ok(())
+    }
+    
+    /// Save settings to disk
+    pub fn save_settings(&self) -> Result<(), String> {
+        let settings_path = self.config_dir.join("settings.json");
+        let content = serde_json::to_string_pretty(&self.settings)
+            .map_err(|e| format!("Failed to serialize settings: {}", e))?;
+        std::fs::write(&settings_path, content)
+            .map_err(|e| format!("Failed to write settings file: {}", e))?;
+        Ok(())
+    }
+    
+    /// Get all snippets
+    pub fn snippets(&self) -> &[Snippet] {
+        &self.config.matches
+    }
+    
+    /// Get snippets as mutable
+    pub fn snippets_mut(&mut self) -> &mut Vec<Snippet> {
+        &mut self.config.matches
+    }
+    
+    /// Get settings
+    pub fn settings(&self) -> &AppSettings {
+        &self.settings
+    }
+    
+    /// Get settings as mutable
+    pub fn settings_mut(&mut self) -> &mut AppSettings {
+        &mut self.settings
+    }
+    
+    /// Add a new snippet
+    pub fn add_snippet(&mut self, snippet: Snippet) {
+        self.config.matches.push(snippet);
+    }
+    
+    /// Remove a snippet by ID
+    pub fn remove_snippet(&mut self, id: &str) -> bool {
+        if let Some(pos) = self.config.matches.iter().position(|s| s.id == id) {
+            self.config.matches.remove(pos);
+            true
+        } else {
+            false
+        }
+    }
+    
+    /// Update a snippet by ID
+    pub fn update_snippet(&mut self, id: &str, snippet: Snippet) -> bool {
+        if let Some(existing) = self.config.matches.iter_mut().find(|s| s.id == id) {
+            *existing = snippet;
+            true
+        } else {
+            false
+        }
+    }
+    
+    /// Find a snippet that matches the given buffer
+    pub fn find_matching_snippet(&self, buffer: &str) -> Option<&Snippet> {
+        for snippet in &self.config.matches {
+            if let Some(ref trigger) = snippet.trigger {
+                if buffer.ends_with(trigger) {
+                    return Some(snippet);
+                }
+            }
+            // TODO: Add regex matching
+        }
+        None
+    }
+}
+
+/// Get the configuration directory path
+fn get_config_dir() -> Result<PathBuf, String> {
+    let base = dirs::config_dir()
+        .or_else(|| dirs::home_dir().map(|h| h.join(".config")))
+        .ok_or_else(|| "Could not determine config directory".to_string())?;
+    Ok(base.join("swifttype"))
+}
+
+/// Create default configuration with example snippets
+fn create_default_config() -> Config {
+    Config {
+        matches: vec![
+            Snippet {
+                id: "example_hello".to_string(),
+                trigger: Some(":hello".to_string()),
+                regex: None,
+                replace: "Hello, World!".to_string(),
+                label: Some("Hello World".to_string()),
+                word: false,
+                uppercase_style: None,
+                image_path: None,
+                shell: None,
+                form_fields: None,
+                filter_app: None,
+            },
+            Snippet {
+                id: "example_date".to_string(),
+                trigger: Some(":date".to_string()),
+                regex: None,
+                replace: "{{date}}".to_string(),
+                label: Some("Current Date".to_string()),
+                word: false,
+                uppercase_style: None,
+                image_path: None,
+                shell: None,
+                form_fields: None,
+                filter_app: None,
+            },
+            Snippet {
+                id: "example_email".to_string(),
+                trigger: Some(":email".to_string()),
+                regex: None,
+                replace: "example@email.com".to_string(),
+                label: Some("Email Address".to_string()),
+                word: false,
+                uppercase_style: None,
+                image_path: None,
+                shell: None,
+                form_fields: None,
+                filter_app: None,
+            },
+        ],
+        global_vars: HashMap::new(),
+    }
+}
+
+// Add dirs crate dependency - this will be added to Cargo.toml
+</file>
+
+<file path="src-tauri/src/keyboard_hook.rs">
+//! Keyboard Hook Module
+//! 
+//! Implements a global low-level keyboard hook using Windows API
+//! to capture keystrokes for text expansion functionality.
+
+use once_cell::sync::Lazy;
+use parking_lot::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use windows::Win32::Foundation::{HINSTANCE, LPARAM, LRESULT, WPARAM};
+use windows::Win32::UI::WindowsAndMessaging::{
+    CallNextHookEx, SetWindowsHookExW, UnhookWindowsHookEx, 
+    HC_ACTION, HHOOK, KBDLLHOOKSTRUCT, WH_KEYBOARD_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
+    LLKHF_INJECTED, LLKHF_LOWER_IL_INJECTED,
+};
+
+/// Maximum buffer size for typed characters
+const MAX_BUFFER_SIZE: usize = 256;
+
+/// Wrapper for HHOOK to make it Send + Sync safe
+/// SAFETY: HHOOK is just a handle (pointer) that can be used from any thread
+struct SendHHOOK(HHOOK);
+unsafe impl Send for SendHHOOK {}
+unsafe impl Sync for SendHHOOK {}
+
+/// Global hook handle
+static HOOK_HANDLE: Lazy<Mutex<Option<SendHHOOK>>> = Lazy::new(|| Mutex::new(None));
+
+/// Buffer for typed characters
+static KEYSTROKE_BUFFER: Lazy<Mutex<String>> = Lazy::new(|| Mutex::new(String::with_capacity(MAX_BUFFER_SIZE)));
+
+/// Flag to indicate if we're currently injecting text (to avoid recursive hooks)
+static IS_INJECTING: AtomicBool = AtomicBool::new(false);
+
+/// Flag to indicate the current keystroke should be blocked (trigger was matched)
+static SHOULD_BLOCK_KEYSTROKE: AtomicBool = AtomicBool::new(false);
+
+/// Callback function pointer for when a trigger is detected
+/// Returns true if a trigger was matched and keystroke should be blocked
+static TRIGGER_CALLBACK: Lazy<Mutex<Option<Box<dyn Fn(String) -> bool + Send + Sync>>>> = 
+    Lazy::new(|| Mutex::new(None));
+
+/// Virtual key codes for printable characters
+const VK_BACK: u32 = 0x08;
+const VK_RETURN: u32 = 0x0D;
+const VK_SPACE: u32 = 0x20;
+const VK_TAB: u32 = 0x09;
+const VK_ESCAPE: u32 = 0x1B;
+
+/// Set the trigger detection callback
+/// The callback should return true if a trigger was matched (to block the keystroke)
+pub fn set_trigger_callback<F>(callback: F) 
+where 
+    F: Fn(String) -> bool + Send + Sync + 'static 
+{
+    let mut cb = TRIGGER_CALLBACK.lock();
+    *cb = Some(Box::new(callback));
+}
+
+/// Get the current keystroke buffer
+pub fn get_buffer() -> String {
+    KEYSTROKE_BUFFER.lock().clone()
+}
+
+/// Clear the keystroke buffer
+pub fn clear_buffer() {
+    KEYSTROKE_BUFFER.lock().clear();
+}
+
+/// Set the injecting flag to prevent hook recursion
+pub fn set_injecting(value: bool) {
+    IS_INJECTING.store(value, Ordering::SeqCst);
+}
+
+/// Check if we're currently injecting
+pub fn is_injecting() -> bool {
+    IS_INJECTING.load(Ordering::SeqCst)
+}
+
+/// Remove characters from the end of the buffer
+pub fn remove_chars_from_buffer(count: usize) {
+    let mut buffer = KEYSTROKE_BUFFER.lock();
+    let new_len = buffer.len().saturating_sub(count);
+    buffer.truncate(new_len);
+}
+
+/// Convert virtual key code to character (simplified)
+fn vk_to_char(vk_code: u32, shift_pressed: bool) -> Option<char> {
+    match vk_code {
+        // Letters A-Z
+        0x41..=0x5A => {
+            let base = (vk_code - 0x41) as u8 + b'a';
+            Some(if shift_pressed { 
+                (base - 32) as char 
+            } else { 
+                base as char 
+            })
+        }
+        // Numbers 0-9
+        0x30..=0x39 => Some((vk_code as u8) as char),
+        // Numpad 0-9
+        0x60..=0x69 => Some((b'0' + (vk_code - 0x60) as u8) as char),
+        // Common punctuation
+        VK_SPACE => Some(' '),
+        0xBA => Some(if shift_pressed { ':' } else { ';' }),  // ; :
+        0xBB => Some(if shift_pressed { '+' } else { '=' }),  // = +
+        0xBC => Some(if shift_pressed { '<' } else { ',' }),  // , <
+        0xBD => Some(if shift_pressed { '_' } else { '-' }),  // - _
+        0xBE => Some(if shift_pressed { '>' } else { '.' }),  // . >
+        0xBF => Some(if shift_pressed { '?' } else { '/' }),  // / ?
+        0xC0 => Some(if shift_pressed { '~' } else { '`' }),  // ` ~
+        0xDB => Some(if shift_pressed { '{' } else { '[' }),  // [ {
+        0xDC => Some(if shift_pressed { '|' } else { '\\' }), // \ |
+        0xDD => Some(if shift_pressed { '}' } else { ']' }),  // ] }
+        0xDE => Some(if shift_pressed { '"' } else { '\'' }), // ' "
+        _ => None,
+    }
+}
+
+/// Check if shift key is pressed
+fn is_shift_pressed() -> bool {
+    use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
+    const VK_SHIFT: i32 = 0x10;
+    unsafe { GetAsyncKeyState(VK_SHIFT) < 0 }
+}
+
+/// Low-level keyboard hook callback
+unsafe extern "system" fn keyboard_hook_callback(
+    n_code: i32,
+    w_param: WPARAM,
+    l_param: LPARAM,
+) -> LRESULT {
+    // If we're injecting, skip processing
+    if is_injecting() {
+        return CallNextHookEx(None, n_code, w_param, l_param);
+    }
+
+    if n_code == HC_ACTION as i32 {
+        let kbd_struct = &*(l_param.0 as *const KBDLLHOOKSTRUCT);
+        
+        // Skip injected keys to prevent infinite loops
+        let flags = kbd_struct.flags.0;
+        if (flags & LLKHF_INJECTED.0) != 0 || (flags & LLKHF_LOWER_IL_INJECTED.0) != 0 {
+            return CallNextHookEx(None, n_code, w_param, l_param);
+        }
+
+        let msg_type = w_param.0 as u32;
+        if msg_type == WM_KEYDOWN || msg_type == WM_SYSKEYDOWN {
+            let vk_code = kbd_struct.vkCode;
+            
+            match vk_code {
+                VK_BACK => {
+                    // Handle backspace - remove last character from buffer
+                    let mut buffer = KEYSTROKE_BUFFER.lock();
+                    buffer.pop();
+                }
+                VK_RETURN | VK_ESCAPE | VK_TAB => {
+                    // Clear buffer on Enter, Escape, or Tab
+                    clear_buffer();
+                }
+                _ => {
+                    // Try to convert to character
+                    if let Some(ch) = vk_to_char(vk_code, is_shift_pressed()) {
+                        let mut buffer = KEYSTROKE_BUFFER.lock();
+                        buffer.push(ch);
+                        
+                        // Prevent buffer from growing too large
+                        if buffer.len() > MAX_BUFFER_SIZE {
+                            let drain_count = buffer.len() - MAX_BUFFER_SIZE / 2;
+                            buffer.drain(..drain_count);
+                        }
+                        
+                        // Clone buffer and trigger callback
+                        let buffer_content = buffer.clone();
+                        drop(buffer); // Release lock before callback
+                        
+                        // Call trigger callback if set
+                        let callback = TRIGGER_CALLBACK.lock();
+                        if let Some(ref cb) = *callback {
+                            if cb(buffer_content) {
+                                // Trigger was matched - block this keystroke
+                                SHOULD_BLOCK_KEYSTROKE.store(true, Ordering::SeqCst);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Check if we should block the keystroke
+    if SHOULD_BLOCK_KEYSTROKE.swap(false, Ordering::SeqCst) {
+        return LRESULT(1); // Block the keystroke
+    }
+
+    CallNextHookEx(None, n_code, w_param, l_param)
+}
+
+/// Install the keyboard hook
+pub fn install_hook() -> Result<(), String> {
+    let mut handle = HOOK_HANDLE.lock();
+    
+    if handle.is_some() {
+        return Err("Hook already installed".to_string());
+    }
+
+    unsafe {
+        let hook = SetWindowsHookExW(
+            WH_KEYBOARD_LL,
+            Some(keyboard_hook_callback),
+            HINSTANCE::default(),
+            0,
+        ).map_err(|e| format!("Failed to install hook: {:?}", e))?;
+        
+        *handle = Some(SendHHOOK(hook));
+    }
+    
+    log::info!("Keyboard hook installed successfully");
+    Ok(())
+}
+
+/// Uninstall the keyboard hook
+pub fn uninstall_hook() -> Result<(), String> {
+    let mut handle = HOOK_HANDLE.lock();
+    
+    if let Some(SendHHOOK(hook)) = handle.take() {
+        unsafe {
+            UnhookWindowsHookEx(hook)
+                .map_err(|e| format!("Failed to uninstall hook: {:?}", e))?;
+        }
+        log::info!("Keyboard hook uninstalled");
+    }
+    
+    Ok(())
+}
+
+/// Check if hook is installed
+pub fn is_hook_installed() -> bool {
+    HOOK_HANDLE.lock().is_some()
+}
+</file>
+
+<file path="src-tauri/src/lib.rs">
+//! SwiftType - A Modern Text Expander
+//! 
+//! Main library entry point that wires up the Tauri application
+//! with the text expansion engine.
+
+mod keyboard_hook;
+mod text_injector;
+mod config;
+mod trigger_engine;
+
+use std::sync::Arc;
+use parking_lot::RwLock;
+use tauri::{AppHandle, Manager, State};
+use serde::{Deserialize, Serialize};
+
+use config::{ConfigManager, Snippet, AppSettings};
+use trigger_engine::TriggerEngine;
+
+/// Application state shared across commands
+pub struct AppState {
+    config: Arc<RwLock<ConfigManager>>,
+    engine: Arc<RwLock<TriggerEngine>>,
+}
+
+// ============================================================================
+// Tauri Commands - Snippets Management
+// ============================================================================
+
+/// Get all snippets
+#[tauri::command]
+fn get_snippets(state: State<AppState>) -> Vec<Snippet> {
+    state.config.read().snippets().to_vec()
+}
+
+/// Add a new snippet
+#[tauri::command]
+fn add_snippet(state: State<AppState>, snippet: Snippet) -> Result<(), String> {
+    let mut config = state.config.write();
+    config.add_snippet(snippet);
+    config.save_config()?;
+    Ok(())
+}
+
+/// Update an existing snippet
+#[tauri::command]
+fn update_snippet(state: State<AppState>, id: String, snippet: Snippet) -> Result<bool, String> {
+    let mut config = state.config.write();
+    let updated = config.update_snippet(&id, snippet);
+    if updated {
+        config.save_config()?;
+    }
+    Ok(updated)
+}
+
+/// Delete a snippet
+#[tauri::command]
+fn delete_snippet(state: State<AppState>, id: String) -> Result<bool, String> {
+    let mut config = state.config.write();
+    let deleted = config.remove_snippet(&id);
+    if deleted {
+        config.save_config()?;
+    }
+    Ok(deleted)
+}
+
+// ============================================================================
+// Tauri Commands - Settings
+// ============================================================================
+
+/// Get application settings
+#[tauri::command]
+fn get_settings(state: State<AppState>) -> AppSettings {
+    state.config.read().settings().clone()
+}
+
+/// Update application settings
+#[tauri::command]
+fn update_settings(state: State<AppState>, settings: AppSettings) -> Result<(), String> {
+    let mut config = state.config.write();
+    *config.settings_mut() = settings;
+    config.save_settings()?;
+    Ok(())
+}
+
+// ============================================================================
+// Tauri Commands - Engine Control
+// ============================================================================
+
+/// Get engine status
+#[tauri::command]
+fn get_engine_status(state: State<AppState>) -> EngineStatus {
+    let engine = state.engine.read();
+    EngineStatus {
+        enabled: engine.is_enabled(),
+        hook_installed: keyboard_hook::is_hook_installed(),
+    }
+}
+
+/// Toggle the text expansion engine
+#[tauri::command]
+fn toggle_engine(state: State<AppState>, enabled: bool) -> Result<(), String> {
+    let mut engine = state.engine.write();
+    engine.set_enabled(enabled);
+    
+    if enabled && !keyboard_hook::is_hook_installed() {
+        keyboard_hook::install_hook()?;
+    }
+    
+    Ok(())
+}
+
+/// Clear the keystroke buffer
+#[tauri::command]
+fn clear_buffer() {
+    keyboard_hook::clear_buffer();
+}
+
+/// Get current keystroke buffer (for debugging)
+#[tauri::command]
+fn get_buffer() -> String {
+    keyboard_hook::get_buffer()
+}
+
+#[derive(Serialize)]
+struct EngineStatus {
+    enabled: bool,
+    hook_installed: bool,
+}
+
+// ============================================================================
+// Tauri Commands - Search
+// ============================================================================
+
+/// Search snippets by trigger or label
+#[tauri::command]
+fn search_snippets(state: State<AppState>, query: String) -> Vec<Snippet> {
+    let config = state.config.read();
+    let query_lower = query.to_lowercase();
+    
+    config.snippets()
+        .iter()
+        .filter(|s| {
+            if let Some(ref trigger) = s.trigger {
+                if trigger.to_lowercase().contains(&query_lower) {
+                    return true;
+                }
+            }
+            if let Some(ref label) = s.label {
+                if label.to_lowercase().contains(&query_lower) {
+                    return true;
+                }
+            }
+            s.replace.to_lowercase().contains(&query_lower)
+        })
+        .cloned()
+        .collect()
+}
+
+// ============================================================================
+// Application Setup
+// ============================================================================
+
+fn setup_trigger_callback(engine: Arc<RwLock<TriggerEngine>>) {
+    keyboard_hook::set_trigger_callback(move |buffer| {
+        let mut eng = engine.write();
+        if let Some(result) = eng.process_buffer(&buffer) {
+            if !result.has_form {
+                if let Err(e) = eng.execute_expansion(&result) {
+                    log::error!("Failed to execute expansion: {}", e);
+                    return false;
+                }
+                return true; // Trigger matched, block keystroke
+            }
+            // TODO: Handle form-based snippets by emitting event to frontend
+            return true; // Still matched, block keystroke
+        }
+        false // No trigger matched
+    });
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    // Initialize logger
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+        .init();
+    
+    log::info!("Starting SwiftType...");
+    
+    // Initialize configuration
+    let config = match ConfigManager::new() {
+        Ok(cfg) => Arc::new(RwLock::new(cfg)),
+        Err(e) => {
+            log::error!("Failed to initialize config: {}", e);
+            eprintln!("Failed to initialize config: {}", e);
+            return;
+        }
+    };
+    
+    // Initialize trigger engine
+    let engine = Arc::new(RwLock::new(TriggerEngine::new(config.clone())));
+    
+    // Set up trigger callback
+    setup_trigger_callback(engine.clone());
+    
+    // Install keyboard hook
+    if let Err(e) = keyboard_hook::install_hook() {
+        log::error!("Failed to install keyboard hook: {}", e);
+    }
+    
+    let app_state = AppState { config, engine };
+    
+    tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
+        .manage(app_state)
+        .invoke_handler(tauri::generate_handler![
+            // Snippets
+            get_snippets,
+            add_snippet,
+            update_snippet,
+            delete_snippet,
+            search_snippets,
+            // Settings
+            get_settings,
+            update_settings,
+            // Engine
+            get_engine_status,
+            toggle_engine,
+            clear_buffer,
+            get_buffer,
+        ])
+        .on_window_event(|window, event| {
+            // Handle window close - minimize to tray instead
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                window.hide().unwrap();
+                api.prevent_close();
+            }
+        })
+        .run(tauri::generate_context!())
+        .expect("error while running SwiftType");
+}
+</file>
+
+<file path="src-tauri/src/main.rs">
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+fn main() {
+    swifttype_lib::run()
+}
+</file>
+
+<file path="src-tauri/src/text_injector.rs">
+//! Text Injector Module
+//! 
+//! Handles injecting replacement text via simulated keystrokes or clipboard.
+
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, 
+    KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, KEYEVENTF_UNICODE,
+    VK_BACK, VK_CONTROL, VIRTUAL_KEY,
+};
+
+use crate::keyboard_hook;
+
+/// Injection method
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum InjectionMethod {
+    /// Simulate keystrokes (default)
+    Keystrokes,
+    /// Use clipboard paste (faster for long text)
+    Clipboard,
+    /// Automatically choose based on text length
+    Auto,
+}
+
+impl Default for InjectionMethod {
+    fn default() -> Self {
+        InjectionMethod::Auto
+    }
+}
+
+/// Threshold for switching to clipboard method in auto mode
+const CLIPBOARD_THRESHOLD: usize = 32;
+
+/// Send a single virtual key press
+fn send_key(vk: VIRTUAL_KEY, key_up: bool) {
+    let flags = if key_up { KEYEVENTF_KEYUP } else { KEYBD_EVENT_FLAGS::default() };
+    
+    let input = INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: vk,
+                wScan: 0,
+                dwFlags: flags,
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    };
+    
+    unsafe {
+        SendInput(&[input], std::mem::size_of::<INPUT>() as i32);
+    }
+}
+
+/// Send a Unicode character
+fn send_unicode_char(ch: char) {
+    let scan_code = ch as u16;
+    
+    // Key down
+    let input_down = INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: VIRTUAL_KEY(0),
+                wScan: scan_code,
+                dwFlags: KEYEVENTF_UNICODE,
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    };
+    
+    // Key up
+    let input_up = INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: VIRTUAL_KEY(0),
+                wScan: scan_code,
+                dwFlags: KEYEVENTF_UNICODE | KEYEVENTF_KEYUP,
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    };
+    
+    unsafe {
+        SendInput(&[input_down, input_up], std::mem::size_of::<INPUT>() as i32);
+    }
+}
+
+/// Send multiple backspace key presses
+pub fn send_backspaces(count: usize) {
+    keyboard_hook::set_injecting(true);
+    
+    for _ in 0..count {
+        send_key(VK_BACK, false);
+        send_key(VK_BACK, true);
+        // Small delay to ensure keys are processed
+        std::thread::sleep(std::time::Duration::from_micros(100));
+    }
+    
+    keyboard_hook::set_injecting(false);
+}
+
+/// Inject text using keystrokes
+fn inject_via_keystrokes(text: &str) {
+    keyboard_hook::set_injecting(true);
+    
+    for ch in text.chars() {
+        send_unicode_char(ch);
+        // Small delay between characters for reliability
+        std::thread::sleep(std::time::Duration::from_micros(50));
+    }
+    
+    keyboard_hook::set_injecting(false);
+}
+
+/// Inject text using clipboard
+fn inject_via_clipboard(text: &str) -> Result<(), String> {
+    use windows::Win32::System::DataExchange::{
+        OpenClipboard, CloseClipboard, EmptyClipboard, SetClipboardData, GetClipboardData,
+    };
+    use windows::Win32::System::Memory::{
+        GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE,
+    };
+    use windows::Win32::Foundation::HWND;
+    
+    keyboard_hook::set_injecting(true);
+    
+    let result = unsafe {
+        // Open clipboard
+        OpenClipboard(HWND::default())
+            .map_err(|e| format!("Failed to open clipboard: {:?}", e))?;
+        
+        // Save current clipboard content (optional, for restore)
+        let _old_data = GetClipboardData(13); // CF_UNICODETEXT
+        
+        // Empty clipboard
+        if let Err(e) = EmptyClipboard() {
+            let _ = CloseClipboard();
+            return Err(format!("Failed to empty clipboard: {:?}", e));
+        }
+        
+        // Convert text to UTF-16
+        let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+        let size = wide.len() * 2;
+        
+        // Allocate global memory
+        let hglobal = match GlobalAlloc(GMEM_MOVEABLE, size) {
+            Ok(h) => h,
+            Err(e) => {
+                let _ = CloseClipboard();
+                return Err(format!("Failed to allocate memory: {:?}", e));
+            }
+        };
+        
+        // Lock and copy data
+        let ptr = GlobalLock(hglobal);
+        if ptr.is_null() {
+            let _ = CloseClipboard();
+            return Err("Failed to lock memory".to_string());
+        }
+        
+        std::ptr::copy_nonoverlapping(wide.as_ptr(), ptr as *mut u16, wide.len());
+        let _ = GlobalUnlock(hglobal);
+        
+        // Set clipboard data (CF_UNICODETEXT = 13)
+        if let Err(e) = SetClipboardData(13, windows::Win32::Foundation::HANDLE(hglobal.0)) {
+            let _ = CloseClipboard();
+            return Err(format!("Failed to set clipboard data: {:?}", e));
+        }
+        
+        // Close clipboard
+        let _ = CloseClipboard();
+        
+        Ok(())
+    };
+    
+    // Simulate Ctrl+V
+    if result.is_ok() {
+        send_key(VK_CONTROL, false);
+        send_key(VIRTUAL_KEY(0x56), false); // V key
+        send_key(VIRTUAL_KEY(0x56), true);
+        send_key(VK_CONTROL, true);
+        
+        // Small delay for paste to complete
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    
+    keyboard_hook::set_injecting(false);
+    result
+}
+
+/// Inject replacement text using the specified method
+pub fn inject_text(text: &str, method: InjectionMethod) -> Result<(), String> {
+    let actual_method = match method {
+        InjectionMethod::Auto => {
+            if text.len() > CLIPBOARD_THRESHOLD {
+                InjectionMethod::Clipboard
+            } else {
+                InjectionMethod::Keystrokes
+            }
+        }
+        other => other,
+    };
+    
+    match actual_method {
+        InjectionMethod::Keystrokes => {
+            inject_via_keystrokes(text);
+            Ok(())
+        }
+        InjectionMethod::Clipboard => inject_via_clipboard(text),
+        InjectionMethod::Auto => unreachable!(),
+    }
+}
+
+/// Perform a text replacement: remove trigger chars and inject replacement
+pub fn replace_text(trigger_len: usize, replacement: &str, method: InjectionMethod) -> Result<(), String> {
+    // First, send backspaces to remove the trigger
+    send_backspaces(trigger_len);
+    
+    // Small delay before injecting replacement
+    std::thread::sleep(std::time::Duration::from_millis(5));
+    
+    // Inject the replacement text
+    inject_text(replacement, method)?;
+    
+    // Update the keyboard buffer
+    keyboard_hook::remove_chars_from_buffer(trigger_len);
+    
+    Ok(())
+}
+</file>
+
+<file path="src-tauri/src/trigger_engine.rs">
+//! Trigger Engine Module
+//! 
+//! Handles trigger detection, variable expansion, and text replacement coordination.
+
+use chrono::Local;
+use regex::Regex;
+use std::collections::HashMap;
+use std::sync::Arc;
+use parking_lot::RwLock;
+
+use crate::config::{ConfigManager, Snippet};
+use crate::text_injector::{InjectionMethod, replace_text};
+use crate::keyboard_hook;
+
+/// Compiled regex cache
+pub struct TriggerEngine {
+    config: Arc<RwLock<ConfigManager>>,
+    regex_cache: HashMap<String, Regex>,
+    injection_method: InjectionMethod,
+    enabled: bool,
+}
+
+impl TriggerEngine {
+    /// Create a new trigger engine
+    pub fn new(config: Arc<RwLock<ConfigManager>>) -> Self {
+        let injection_method = {
+            let cfg = config.read();
+            match cfg.settings().injection_method.as_str() {
+                "keystrokes" => InjectionMethod::Keystrokes,
+                "clipboard" => InjectionMethod::Clipboard,
+                _ => InjectionMethod::Auto,
+            }
+        };
+        
+        Self {
+            config,
+            regex_cache: HashMap::new(),
+            injection_method,
+            enabled: true,
+        }
+    }
+    
+    /// Enable or disable the engine
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
+    
+    /// Check if engine is enabled
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+    
+    /// Set injection method
+    pub fn set_injection_method(&mut self, method: InjectionMethod) {
+        self.injection_method = method;
+    }
+    
+    /// Process a keystroke buffer and check for triggers
+    pub fn process_buffer(&mut self, buffer: &str) -> Option<ExpansionResult> {
+        if !self.enabled {
+            return None;
+        }
+        
+        // Collect matching info first to avoid borrow issues
+        let match_info: Option<(Option<(String, usize)>, Option<(String, String, String, bool)>)> = {
+            let config = self.config.read();
+            
+            for snippet in config.snippets() {
+                // Check exact trigger
+                if let Some(ref trigger) = snippet.trigger {
+                    if buffer.ends_with(trigger) {
+                        return Some(ExpansionResult {
+                            trigger_len: trigger.len(),
+                            replacement: self.expand_variables(&snippet.replace),
+                            snippet_id: snippet.id.clone(),
+                            has_form: snippet.form_fields.is_some(),
+                        });
+                    }
+                }
+                
+                // Check regex trigger - collect data for later processing
+                if let Some(ref regex_pattern) = snippet.regex {
+                    // Clone what we need to check regex outside the config borrow
+                    let pattern = regex_pattern.clone();
+                    let replace_text = snippet.replace.clone();
+                    let snip_id = snippet.id.clone();
+                    let has_form = snippet.form_fields.is_some();
+                    drop(config);
+                    
+                    if let Some(result) = self.check_regex_trigger(buffer, &pattern, &replace_text, &snip_id, has_form) {
+                        return Some(result);
+                    }
+                    
+                    // Re-acquire config for next iteration
+                    // But since we found no match, continue checking
+                    // For simplicity, just return None here and let caller retry
+                    return None;
+                }
+            }
+            None
+        };
+        
+        None
+    }
+    
+    /// Check for regex trigger match
+    fn check_regex_trigger(
+        &mut self, 
+        buffer: &str, 
+        pattern: &str, 
+        replace_text: &str,
+        snippet_id: &str,
+        has_form: bool,
+    ) -> Option<ExpansionResult> {
+        // Get or compile regex
+        let regex = if let Some(cached) = self.regex_cache.get(pattern) {
+            cached
+        } else {
+            match Regex::new(pattern) {
+                Ok(re) => {
+                    self.regex_cache.insert(pattern.to_string(), re);
+                    self.regex_cache.get(pattern).unwrap()
+                }
+                Err(e) => {
+                    log::error!("Invalid regex pattern '{}': {}", pattern, e);
+                    return None;
+                }
+            }
+        };
+        
+        // Check if buffer ends with a match
+        if let Some(mat) = regex.find(buffer) {
+            if mat.end() == buffer.len() {
+                let matched_text = mat.as_str();
+                let replacement = regex.replace(matched_text, replace_text);
+                let replacement = self.expand_variables(&replacement);
+                
+                return Some(ExpansionResult {
+                    trigger_len: matched_text.len(),
+                    replacement,
+                    snippet_id: snippet_id.to_string(),
+                    has_form,
+                });
+            }
+        }
+        
+        None
+    }
+    
+    /// Expand built-in variables in replacement text
+    fn expand_variables(&self, text: &str) -> String {
+        let now = Local::now();
+        
+        let mut result = text.to_string();
+        
+        // Date/time variables
+        result = result.replace("{{date}}", &now.format("%Y-%m-%d").to_string());
+        result = result.replace("{{time}}", &now.format("%H:%M:%S").to_string());
+        result = result.replace("{{datetime}}", &now.format("%Y-%m-%d %H:%M:%S").to_string());
+        result = result.replace("{{year}}", &now.format("%Y").to_string());
+        result = result.replace("{{month}}", &now.format("%m").to_string());
+        result = result.replace("{{day}}", &now.format("%d").to_string());
+        result = result.replace("{{hour}}", &now.format("%H").to_string());
+        result = result.replace("{{minute}}", &now.format("%M").to_string());
+        result = result.replace("{{second}}", &now.format("%S").to_string());
+        
+        // Day names
+        result = result.replace("{{weekday}}", &now.format("%A").to_string());
+        result = result.replace("{{weekday_short}}", &now.format("%a").to_string());
+        result = result.replace("{{month_name}}", &now.format("%B").to_string());
+        result = result.replace("{{month_short}}", &now.format("%b").to_string());
+        
+        // Clipboard (if requested)
+        if result.contains("{{clipboard}}") {
+            if let Some(clip_text) = get_clipboard_text() {
+                result = result.replace("{{clipboard}}", &clip_text);
+            } else {
+                result = result.replace("{{clipboard}}", "");
+            }
+        }
+        
+        result
+    }
+    
+    /// Execute the expansion
+    pub fn execute_expansion(&self, result: &ExpansionResult) -> Result<(), String> {
+        replace_text(result.trigger_len, &result.replacement, self.injection_method)?;
+        keyboard_hook::clear_buffer();
+        log::info!("Expanded snippet: {}", result.snippet_id);
+        Ok(())
+    }
+}
+
+/// Result of a trigger match
+#[derive(Debug, Clone)]
+pub struct ExpansionResult {
+    /// Number of characters to remove (trigger length)
+    pub trigger_len: usize,
+    /// The replacement text (with variables expanded)
+    pub replacement: String,
+    /// ID of the matched snippet
+    pub snippet_id: String,
+    /// Whether this snippet has form fields
+    pub has_form: bool,
+}
+
+/// Get text from clipboard
+fn get_clipboard_text() -> Option<String> {
+    use windows::Win32::System::DataExchange::{OpenClipboard, CloseClipboard, GetClipboardData};
+    use windows::Win32::System::Memory::{GlobalLock, GlobalUnlock};
+    use windows::Win32::Foundation::{HWND, HGLOBAL};
+    
+    unsafe {
+        if OpenClipboard(HWND::default()).is_err() {
+            return None;
+        }
+        
+        // CF_UNICODETEXT = 13
+        let handle = match GetClipboardData(13) {
+            Ok(h) => h,
+            Err(_) => {
+                let _ = CloseClipboard();
+                return None;
+            }
+        };
+        
+        // Convert HANDLE to HGLOBAL
+        let hglobal = HGLOBAL(handle.0);
+        
+        let ptr = GlobalLock(hglobal);
+        if ptr.is_null() {
+            let _ = CloseClipboard();
+            return None;
+        }
+        
+        // Read UTF-16 string
+        let mut len = 0;
+        let wptr = ptr as *const u16;
+        while *wptr.add(len) != 0 {
+            len += 1;
+        }
+        
+        let slice = std::slice::from_raw_parts(wptr, len);
+        let text = String::from_utf16_lossy(slice);
+        
+        let _ = GlobalUnlock(hglobal);
+        let _ = CloseClipboard();
+        
+        Some(text)
+    }
+}
+</file>
+
+<file path="src-tauri/tauri.conf.json">
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "SwiftType",
+  "version": "0.1.0",
+  "identifier": "com.swifttype.app",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "SwiftType",
+        "width": 1000,
+        "height": 700,
+        "minWidth": 800,
+        "minHeight": 600,
+        "center": true,
+        "decorations": true,
+        "resizable": true,
+        "visible": true
+      }
+    ],
+    "trayIcon": {
+      "iconPath": "icons/icon.ico",
+      "iconAsTemplate": false
+    },
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}
+</file>
+
+<file path="src/App.css">
+:root {
+  /* Color Palette - Dark Theme */
+  --bg-primary: #0f0f12;
+  --bg-secondary: #1a1a20;
+  --bg-tertiary: #252530;
+  --bg-card: rgba(30, 30, 40, 0.8);
+  --bg-card-hover: rgba(40, 40, 55, 0.9);
+  
+  /* Accent Colors */
+  --accent-primary: #6366f1;
+  --accent-secondary: #8b5cf6;
+  --accent-gradient: linear-gradient(135deg, #6366f1, #8b5cf6);
+  --accent-glow: rgba(99, 102, 241, 0.4);
+  
+  /* Success/Error */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  
+  /* Text Colors */
+  --text-primary: #f5f5f7;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  
+  /* Border Colors */
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-focus: rgba(99, 102, 241, 0.5);
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 20px var(--accent-glow);
+  
+  /* Glassmorphism */
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  
+  /* Border Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow: 400ms ease;
+  
+  /* Typography */
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* Light Theme Override */
+[data-theme="light"] {
+  --bg-primary: #f5f5f7;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e8e8ed;
+  --bg-card: rgba(255, 255, 255, 0.9);
+  --bg-card-hover: rgba(240, 240, 245, 0.95);
+  
+  --text-primary: #1a1a1a;
+  --text-secondary: #52525b;
+  --text-muted: #71717a;
+  
+  --border-color: rgba(0, 0, 0, 0.1);
+  --border-focus: rgba(99, 102, 241, 0.5);
+  
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+  
+  --glass-bg: rgba(0, 0, 0, 0.02);
+  --glass-border: rgba(0, 0, 0, 0.06);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-family);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* App Container */
+.app {
+  display: flex;
+  height: 100vh;
+  background: var(--bg-primary);
+}
+
+/* Sidebar */
+.sidebar {
+  width: 260px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-md);
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.sidebar-logo {
+  width: 40px;
+  height: 40px;
+  background: var(--accent-gradient);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: white;
+  box-shadow: var(--shadow-glow);
+}
+
+.sidebar-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sidebar-nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-md);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.nav-item:hover {
+  background: var(--glass-bg);
+  color: var(--text-primary);
+}
+
+.nav-item.active {
+  background: var(--accent-gradient);
+  color: white;
+  box-shadow: var(--shadow-glow);
+}
+
+.nav-item svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Main Content */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-lg) var(--space-xl);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.header-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+/* Search Input */
+.search-wrapper {
+  position: relative;
+  width: 300px;
+}
+
+.search-input {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  padding-left: 40px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  transition: all var(--transition-fast);
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.search-icon {
+  position: absolute;
+  left: var(--space-md);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+/* Content Area */
+.content-area {
+  flex: 1;
+  padding: var(--space-xl);
+  overflow-y: auto;
+}
+
+/* Snippet Grid */
+.snippet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-lg);
+}
+
+/* Snippet Card */
+.snippet-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  backdrop-filter: blur(10px);
+}
+
+.snippet-card:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-focus);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.snippet-trigger {
+  font-family: var(--font-mono);
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--accent-primary);
+  margin-bottom: var(--space-sm);
+}
+
+.snippet-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-md);
+}
+
+.snippet-preview {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-lg);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-primary {
+  background: var(--accent-gradient);
+  color: white;
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-primary:hover {
+  box-shadow: var(--shadow-glow);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-focus);
+}
+
+.btn-icon {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.btn-icon:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+  border-color: var(--border-focus);
+}
+
+/* Form Elements */
+.form-group {
+  margin-bottom: var(--space-lg);
+}
+
+.form-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-sm);
+}
+
+.form-input {
+  width: 100%;
+  padding: var(--space-md);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  transition: all var(--transition-fast);
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.form-textarea {
+  min-height: 120px;
+  resize: vertical;
+  font-family: var(--font-mono);
+}
+
+/* Toggle Switch */
+.toggle {
+  position: relative;
+  width: 48px;
+  height: 26px;
+  background: var(--bg-tertiary);
+  border-radius: 13px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.toggle.active {
+  background: var(--accent-primary);
+}
+
+.toggle-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+  transition: transform var(--transition-fast);
+}
+
+.toggle.active .toggle-knob {
+  transform: translateX(22px);
+}
+
+/* Status Badge */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.status-badge.enabled {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--success);
+}
+
+.status-badge.disabled {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--error);
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 200ms ease;
+}
+
+.modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+  animation: slideUp 300ms ease;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-lg) var(--space-xl);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.modal-body {
+  padding: var(--space-xl);
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-md);
+  padding: var(--space-lg) var(--space-xl);
+  border-top: 1px solid var(--border-color);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Stats Cards */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-lg);
+  margin-bottom: var(--space-xl);
+}
+
+.stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  backdrop-filter: blur(10px);
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-top: var(--space-xs);
+}
+
+/* Empty State */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xl);
+  text-align: center;
+}
+
+.empty-state-icon {
+  width: 80px;
+  height: 80px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-xl);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-lg);
+  color: var(--text-muted);
+}
+
+.empty-state-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: var(--space-sm);
+}
+
+.empty-state-text {
+  color: var(--text-muted);
+  margin-bottom: var(--space-lg);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-tertiary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* Tooltip */
+[data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: all var(--transition-fast);
+}
+
+[data-tooltip]:hover::after {
+  opacity: 1;
+  visibility: visible;
+}
+</file>
+
+<file path="src/App.tsx">
+import { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import "./App.css";
+
+// Types matching Rust structs
+interface Snippet {
+  id: string;
+  trigger: string | null;
+  regex: string | null;
+  replace: string;
+  label: string | null;
+  word: boolean;
+  uppercase_style: string | null;
+  image_path: string | null;
+  shell: string | null;
+  form_fields: FormField[] | null;
+  filter_app: string | null;
+}
+
+interface FormField {
+  name: string;
+  label: string | null;
+  default: string;
+  field_type: string;
+  choices: string[] | null;
+}
+
+interface AppSettings {
+  enabled: boolean;
+  injection_method: string;
+  search_hotkey: string;
+  undo_backspace_ms: number;
+  start_with_windows: boolean;
+  show_in_tray: boolean;
+  theme: string;
+  toggle_hotkey: string | null;
+}
+
+interface EngineStatus {
+  enabled: boolean;
+  hook_installed: boolean;
+}
+
+// Icons
+const Icons = {
+  Snippets: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14,2 14,8 20,8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+    </svg>
+  ),
+  Settings: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  ),
+  Plus: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  ),
+  Search: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  ),
+  X: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  ),
+  Zap: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+    </svg>
+  ),
+  Power: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
+      <line x1="12" y1="2" x2="12" y2="12" />
+    </svg>
+  ),
+  Trash: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </svg>
+  ),
+  Edit: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </svg>
+  ),
+};
+
+// Main App Component
+function App() {
+  const [activeTab, setActiveTab] = useState<"snippets" | "settings">("snippets");
+  const [snippets, setSnippets] = useState<Snippet[]>([]);
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [engineStatus, setEngineStatus] = useState<EngineStatus | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showEditor, setShowEditor] = useState(false);
+  const [editingSnippet, setEditingSnippet] = useState<Snippet | null>(null);
+
+  // Load data on mount
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const [snips, sets, status] = await Promise.all([
+        invoke<Snippet[]>("get_snippets"),
+        invoke<AppSettings>("get_settings"),
+        invoke<EngineStatus>("get_engine_status"),
+      ]);
+      setSnippets(snips);
+      setSettings(sets);
+      setEngineStatus(status);
+    } catch (err) {
+      console.error("Failed to load data:", err);
+    }
+  };
+
+  // Apply theme when settings change
+  useEffect(() => {
+    if (settings?.theme) {
+      const root = document.documentElement;
+      if (settings.theme === "system") {
+        // Check system preference
+        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        root.setAttribute("data-theme", prefersDark ? "dark" : "light");
+      } else {
+        root.setAttribute("data-theme", settings.theme);
+      }
+    }
+  }, [settings?.theme]);
+
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query);
+    if (query.trim()) {
+      try {
+        const results = await invoke<Snippet[]>("search_snippets", { query });
+        setSnippets(results);
+      } catch (err) {
+        console.error("Search failed:", err);
+      }
+    } else {
+      const snips = await invoke<Snippet[]>("get_snippets");
+      setSnippets(snips);
+    }
+  };
+
+  const handleToggleEngine = async () => {
+    if (!engineStatus) return;
+    try {
+      await invoke("toggle_engine", { enabled: !engineStatus.enabled });
+      const status = await invoke<EngineStatus>("get_engine_status");
+      setEngineStatus(status);
+    } catch (err) {
+      console.error("Failed to toggle engine:", err);
+    }
+  };
+
+  const handleSaveSnippet = async (snippet: Snippet) => {
+    try {
+      if (editingSnippet && editingSnippet.id) {
+        await invoke("update_snippet", { id: editingSnippet.id, snippet });
+      } else {
+        await invoke("add_snippet", { snippet });
+      }
+      await loadData();
+      setShowEditor(false);
+      setEditingSnippet(null);
+    } catch (err) {
+      console.error("Failed to save snippet:", err);
+    }
+  };
+
+  const handleDeleteSnippet = async (id: string) => {
+    try {
+      await invoke("delete_snippet", { id });
+      await loadData();
+    } catch (err) {
+      console.error("Failed to delete snippet:", err);
+    }
+  };
+
+  const handleEditSnippet = (snippet: Snippet) => {
+    setEditingSnippet(snippet);
+    setShowEditor(true);
+  };
+
+  const handleNewSnippet = () => {
+    setEditingSnippet(null);
+    setShowEditor(true);
+  };
+
+  return (
+    <div className="app">
+      {/* Sidebar */}
+      <aside className="sidebar">
+        <div className="sidebar-header">
+          <div className="sidebar-logo">⚡</div>
+          <h1 className="sidebar-title">SwiftType</h1>
+        </div>
+
+        <nav className="sidebar-nav">
+          <div
+            className={`nav-item ${activeTab === "snippets" ? "active" : ""}`}
+            onClick={() => setActiveTab("snippets")}
+          >
+            <Icons.Snippets />
+            <span>Snippets</span>
+          </div>
+          <div
+            className={`nav-item ${activeTab === "settings" ? "active" : ""}`}
+            onClick={() => setActiveTab("settings")}
+          >
+            <Icons.Settings />
+            <span>Settings</span>
+          </div>
+        </nav>
+
+        {/* Engine Status */}
+        <div style={{ marginTop: "auto", padding: "var(--space-md)" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "var(--space-md)",
+              background: "var(--bg-tertiary)",
+              borderRadius: "var(--radius-md)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
+              <Icons.Power />
+              <span style={{ fontSize: "0.875rem" }}>Engine</span>
+            </div>
+            <div
+              className={`toggle ${engineStatus?.enabled ? "active" : ""}`}
+              onClick={handleToggleEngine}
+            >
+              <div className="toggle-knob" />
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="main-content">
+        {activeTab === "snippets" ? (
+          <SnippetsView
+            snippets={snippets}
+            searchQuery={searchQuery}
+            onSearch={handleSearch}
+            onNew={handleNewSnippet}
+            onEdit={handleEditSnippet}
+            onDelete={handleDeleteSnippet}
+          />
+        ) : (
+          <SettingsView settings={settings} onSave={loadData} />
+        )}
+      </main>
+
+      {/* Snippet Editor Modal */}
+      {showEditor && (
+        <SnippetEditor
+          snippet={editingSnippet}
+          onSave={handleSaveSnippet}
+          onClose={() => {
+            setShowEditor(false);
+            setEditingSnippet(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Snippets View Component
+interface SnippetsViewProps {
+  snippets: Snippet[];
+  searchQuery: string;
+  onSearch: (query: string) => void;
+  onNew: () => void;
+  onEdit: (snippet: Snippet) => void;
+  onDelete: (id: string) => void;
+}
+
+function SnippetsView({ snippets, searchQuery, onSearch, onNew, onEdit, onDelete }: SnippetsViewProps) {
+  return (
+    <>
+      <header className="header">
+        <h2 className="header-title">Snippets</h2>
+        <div className="header-actions">
+          <div className="search-wrapper">
+            <span className="search-icon">
+              <Icons.Search />
+            </span>
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Search snippets..."
+              value={searchQuery}
+              onChange={(e) => onSearch(e.target.value)}
+            />
+          </div>
+          <button className="btn btn-primary" onClick={onNew}>
+            <Icons.Plus />
+            New Snippet
+          </button>
+        </div>
+      </header>
+
+      <div className="content-area">
+        {/* Stats */}
+        <div className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-value">{snippets.length}</div>
+            <div className="stat-label">Total Snippets</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-value">
+              {snippets.filter((s) => s.regex).length}
+            </div>
+            <div className="stat-label">Regex Patterns</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-value">
+              {snippets.filter((s) => s.form_fields).length}
+            </div>
+            <div className="stat-label">With Forms</div>
+          </div>
+        </div>
+
+        {/* Snippets Grid */}
+        {snippets.length > 0 ? (
+          <div className="snippet-grid">
+            {snippets.map((snippet) => (
+              <div
+                key={snippet.id}
+                className="snippet-card"
+                onClick={() => onEdit(snippet)}
+              >
+                <div className="snippet-trigger">
+                  {snippet.trigger || snippet.regex || "No trigger"}
+                </div>
+                {snippet.label && (
+                  <div className="snippet-label">{snippet.label}</div>
+                )}
+                <div className="snippet-preview">{snippet.replace}</div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    gap: "var(--space-sm)",
+                    marginTop: "var(--space-md)",
+                  }}
+                >
+                  <button
+                    className="btn-icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(snippet);
+                    }}
+                  >
+                    <Icons.Edit />
+                  </button>
+                  <button
+                    className="btn-icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(snippet.id);
+                    }}
+                  >
+                    <Icons.Trash />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state">
+            <div className="empty-state-icon">
+              <Icons.Snippets />
+            </div>
+            <h3 className="empty-state-title">No snippets yet</h3>
+            <p className="empty-state-text">
+              Create your first snippet to start expanding text automatically
+            </p>
+            <button className="btn btn-primary" onClick={onNew}>
+              <Icons.Plus />
+              Create Snippet
+            </button>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+// Snippet Editor Modal
+interface SnippetEditorProps {
+  snippet: Snippet | null;
+  onSave: (snippet: Snippet) => void;
+  onClose: () => void;
+}
+
+function SnippetEditor({ snippet, onSave, onClose }: SnippetEditorProps) {
+  const [trigger, setTrigger] = useState(snippet?.trigger || "");
+  const [replace, setReplace] = useState(snippet?.replace || "");
+  const [label, setLabel] = useState(snippet?.label || "");
+  const [useRegex, setUseRegex] = useState(!!snippet?.regex);
+  const [regex, setRegex] = useState(snippet?.regex || "");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newSnippet: Snippet = {
+      id: snippet?.id || `snip_${Date.now()}`,
+      trigger: useRegex ? null : trigger,
+      regex: useRegex ? regex : null,
+      replace,
+      label: label || null,
+      word: snippet?.word || false,
+      uppercase_style: snippet?.uppercase_style || null,
+      image_path: snippet?.image_path || null,
+      shell: snippet?.shell || null,
+      form_fields: snippet?.form_fields || null,
+      filter_app: snippet?.filter_app || null,
+    };
+    onSave(newSnippet);
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3 className="modal-title">
+            {snippet ? "Edit Snippet" : "New Snippet"}
+          </h3>
+          <button className="btn-icon" onClick={onClose}>
+            <Icons.X />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
+            <div className="form-group">
+              <label className="form-label">Label (optional)</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g., Email Signature"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-md)", marginBottom: "var(--space-sm)" }}>
+                <label className="form-label" style={{ margin: 0 }}>
+                  {useRegex ? "Regex Pattern" : "Trigger"}
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: "var(--space-xs)", fontSize: "0.875rem", color: "var(--text-secondary)" }}>
+                  <input
+                    type="checkbox"
+                    checked={useRegex}
+                    onChange={(e) => setUseRegex(e.target.checked)}
+                  />
+                  Use Regex
+                </label>
+              </div>
+              <input
+                type="text"
+                className="form-input"
+                placeholder={useRegex ? "e.g., :sig(\\d+)" : "e.g., :hello"}
+                value={useRegex ? regex : trigger}
+                onChange={(e) =>
+                  useRegex ? setRegex(e.target.value) : setTrigger(e.target.value)
+                }
+                style={{ fontFamily: "var(--font-mono)" }}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Replacement Text</label>
+              <textarea
+                className="form-input form-textarea"
+                placeholder="Enter the text to expand to..."
+                value={replace}
+                onChange={(e) => setReplace(e.target.value)}
+              />
+              <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "var(--space-xs)" }}>
+                Variables: {"{{date}}"}, {"{{time}}"}, {"{{clipboard}}"}, {"{{weekday}}"}
+              </p>
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn btn-secondary" onClick={onClose}>
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary">
+              {snippet ? "Save Changes" : "Create Snippet"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// Settings View Component
+interface SettingsViewProps {
+  settings: AppSettings | null;
+  onSave: () => void;
+}
+
+function SettingsView({ settings, onSave }: SettingsViewProps) {
+  const [localSettings, setLocalSettings] = useState<AppSettings | null>(settings);
+
+  useEffect(() => {
+    setLocalSettings(settings);
+  }, [settings]);
+
+  const handleSave = async () => {
+    if (!localSettings) return;
+    try {
+      await invoke("update_settings", { settings: localSettings });
+      onSave();
+    } catch (err) {
+      console.error("Failed to save settings:", err);
+    }
+  };
+
+  if (!localSettings) {
+    return <div className="content-area">Loading...</div>;
+  }
+
+  return (
+    <>
+      <header className="header">
+        <h2 className="header-title">Settings</h2>
+        <div className="header-actions">
+          <button className="btn btn-primary" onClick={handleSave}>
+            Save Settings
+          </button>
+        </div>
+      </header>
+
+      <div className="content-area">
+        <div style={{ maxWidth: 600 }}>
+          <div className="form-group">
+            <label className="form-label">Injection Method</label>
+            <select
+              className="form-input"
+              value={localSettings.injection_method}
+              onChange={(e) =>
+                setLocalSettings({ ...localSettings, injection_method: e.target.value })
+              }
+            >
+              <option value="auto">Auto (Recommended)</option>
+              <option value="keystrokes">Keystrokes</option>
+              <option value="clipboard">Clipboard</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Search Hotkey</label>
+            <input
+              type="text"
+              className="form-input"
+              value={localSettings.search_hotkey}
+              onChange={(e) =>
+                setLocalSettings({ ...localSettings, search_hotkey: e.target.value })
+              }
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Theme</label>
+            <select
+              className="form-input"
+              value={localSettings.theme}
+              onChange={(e) =>
+                setLocalSettings({ ...localSettings, theme: e.target.value })
+              }
+            >
+              <option value="dark">Dark</option>
+              <option value="light">Light</option>
+              <option value="system">System</option>
+            </select>
+          </div>
+
+          <div
+            className="form-group"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <label className="form-label" style={{ marginBottom: 0 }}>
+              Start with Windows
+            </label>
+            <div
+              className={`toggle ${localSettings.start_with_windows ? "active" : ""}`}
+              onClick={() =>
+                setLocalSettings({
+                  ...localSettings,
+                  start_with_windows: !localSettings.start_with_windows,
+                })
+              }
+            >
+              <div className="toggle-knob" />
+            </div>
+          </div>
+
+          <div
+            className="form-group"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <label className="form-label" style={{ marginBottom: 0 }}>
+              Show in System Tray
+            </label>
+            <div
+              className={`toggle ${localSettings.show_in_tray ? "active" : ""}`}
+              onClick={() =>
+                setLocalSettings({
+                  ...localSettings,
+                  show_in_tray: !localSettings.show_in_tray,
+                })
+              }
+            >
+              <div className="toggle-knob" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+export default App;
+</file>
+
+<file path="src/main.tsx">
+import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App";
+
+ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);
+</file>
+
+<file path="src/vite-env.d.ts">
+/// <reference types="vite/client" />
+</file>
+
+<file path="tsconfig.json">
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src"],
+  "references": [{ "path": "./tsconfig.node.json" }]
+}
+</file>
+
+<file path="tsconfig.node.json">
+{
+  "compilerOptions": {
+    "composite": true,
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true
+  },
+  "include": ["vite.config.ts"]
+}
+</file>
+
+<file path="vite.config.ts">
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+// @ts-expect-error process is a nodejs global
+const host = process.env.TAURI_DEV_HOST;
+
+// https://vite.dev/config/
+export default defineConfig(async () => ({
+  plugins: [react()],
+
+  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
+  //
+  // 1. prevent Vite from obscuring rust errors
+  clearScreen: false,
+  // 2. tauri expects a fixed port, fail if that port is not available
+  server: {
+    port: 1420,
+    strictPort: true,
+    host: host || false,
+    hmr: host
+      ? {
+          protocol: "ws",
+          host,
+          port: 1421,
+        }
+      : undefined,
+    watch: {
+      // 3. tell Vite to ignore watching `src-tauri`
+      ignored: ["**/src-tauri/**"],
+    },
+  },
+}));
+</file>
+
+</files>

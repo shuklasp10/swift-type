@@ -1,0 +1,28 @@
+{
+  "output": {
+    "filePath": "repomix-output.xml",
+    "style": "xml",
+    "fileSummary": true,
+    "directoryStructure": true,
+    "removeComments": false,
+    "removeEmptyLines": false,
+    "topFilesLength": 5,
+    "showLineNumbers": false
+  },
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      "src-tauri/target/**",
+      "dist/**",
+      ".vscode/**",
+      "package-lock.json",
+      "src-tauri/icons/**",
+      "src/assets/**",
+      "public/**"
+    ]
+  },
+  "security": {
+    "enableSecurityCheck": true
+  }
+}
