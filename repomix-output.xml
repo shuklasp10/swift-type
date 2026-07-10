@@ -43,6 +43,7 @@ The content is organized as follows:
 <directory_structure>
 .github/workflows/release.yaml
 .gitignore
+CHANGELOG.md
 index.html
 package.json
 README.md
@@ -204,6 +205,24 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+</file>
+
+<file path="CHANGELOG.md">
+# Changelog
+
+## [0.1.1-alpha.0] - 2026-07-10
+
+- ci: add github release workflow
+- chore: setup automated versioning and changelog generation
+- Phase 5: Code Cleanup & Final Testing
+- Phase 4: System Tray Integration
+- Phase 3: Non-Destructive Clipboard Handling
+- Phase 2: Native Internationalization & Layout Support
+- Phase 1: Asynchronous Keyboard Hook Architecture
+- chore: setup repomix and configuration
+- initial commit
+
+All notable changes to this project will be documented in this file.
 </file>
 
 <file path="index.html">
@@ -482,106 +501,11 @@ fn main() {
 }
 </file>
 
-<file path="src-tauri/Cargo.toml">
-[package]
-name = "swifttype"
-version = "0.1.0"
-description = "SwiftType - A Modern Text Expander"
-authors = ["SwiftType"]
-edition = "2021"
-
-[lib]
-name = "swifttype_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
-
-[build-dependencies]
-tauri-build = { version = "2", features = [] }
-
-[dependencies]
-tauri = { version = "2", features = ["tray-icon"] }
-tauri-plugin-opener = "2"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-serde_yaml = "0.9"
-regex = "1"
-chrono = "0.4"
-tokio = { version = "1", features = ["full"] }
-once_cell = "1.19"
-parking_lot = "0.12"
-log = "0.4"
-env_logger = "0.11"
-dirs = "5"
-
-[target.'cfg(windows)'.dependencies]
-windows = { version = "0.58", features = [
-    "Win32_Foundation",
-    "Win32_UI_WindowsAndMessaging",
-    "Win32_UI_Input_KeyboardAndMouse",
-    "Win32_System_LibraryLoader",
-    "Win32_System_Threading",
-    "Win32_System_DataExchange",
-    "Win32_System_Memory",
-] }
-
-[profile.release]
-lto = true
-opt-level = "z"
-strip = true
-</file>
-
 <file path="src-tauri/src/main.rs">
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
     swifttype_lib::run()
-}
-</file>
-
-<file path="src-tauri/tauri.conf.json">
-{
-  "$schema": "https://schema.tauri.app/config/2",
-  "productName": "SwiftType",
-  "version": "0.1.0",
-  "identifier": "com.swifttype.app",
-  "build": {
-    "beforeDevCommand": "npm run dev",
-    "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm run build",
-    "frontendDist": "../dist"
-  },
-  "app": {
-    "windows": [
-      {
-        "title": "SwiftType",
-        "width": 1000,
-        "height": 700,
-        "minWidth": 800,
-        "minHeight": 600,
-        "center": true,
-        "decorations": true,
-        "resizable": true,
-        "visible": true
-      }
-    ],
-    "trayIcon": {
-      "iconPath": "icons/icon.ico",
-      "iconAsTemplate": false
-    },
-    "security": {
-      "csp": null
-    }
-  },
-  "bundle": {
-    "active": true,
-    "targets": "all",
-    "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png",
-      "icons/icon.icns",
-      "icons/icon.ico"
-    ]
-  }
 }
 </file>
 
@@ -1965,6 +1889,53 @@ export default defineConfig(async () => ({
 }));
 </file>
 
+<file path="src-tauri/Cargo.toml">
+[package]
+name = "swifttype"
+version = "0.1.1-alpha.0"
+description = "SwiftType - A Modern Text Expander"
+authors = ["SwiftType"]
+edition = "2021"
+
+[lib]
+name = "swifttype_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+regex = "1"
+chrono = "0.4"
+tokio = { version = "1", features = ["full"] }
+once_cell = "1.19"
+parking_lot = "0.12"
+log = "0.4"
+env_logger = "0.11"
+dirs = "5"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Threading",
+    "Win32_System_DataExchange",
+    "Win32_System_Memory",
+] }
+
+[profile.release]
+lto = true
+opt-level = "z"
+strip = true
+</file>
+
 <file path="src-tauri/src/config.rs">
 //! Configuration Module
 //! 
@@ -2306,36 +2277,50 @@ fn create_default_config() -> Config {
 // Add dirs crate dependency - this will be added to Cargo.toml
 </file>
 
-<file path="package.json">
+<file path="src-tauri/tauri.conf.json">
 {
-  "name": "tauri-app",
-  "private": true,
-  "version": "0.1.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
-    "tauri": "tauri",
-    "repomix": "repomix",
-    "version:alpha": "npm version prerelease --preid=alpha",
-    "version:beta": "npm version prerelease --preid=beta",
-    "version": "node scripts/sync-version.js && git add src-tauri/Cargo.toml src-tauri/tauri.conf.json CHANGELOG.md"
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "SwiftType",
+  "version": "0.1.1-alpha.0",
+  "identifier": "com.swifttype.app",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
   },
-  "dependencies": {
-    "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-opener": "^2",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+  "app": {
+    "windows": [
+      {
+        "title": "SwiftType",
+        "width": 1000,
+        "height": 700,
+        "minWidth": 800,
+        "minHeight": 600,
+        "center": true,
+        "decorations": true,
+        "resizable": true,
+        "visible": true
+      }
+    ],
+    "trayIcon": {
+      "iconPath": "icons/icon.ico",
+      "iconAsTemplate": false
+    },
+    "security": {
+      "csp": null
+    }
   },
-  "devDependencies": {
-    "@tauri-apps/cli": "^2",
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
-    "@vitejs/plugin-react": "^4.6.0",
-    "repomix": "^1.16.0",
-    "typescript": "~5.8.3",
-    "vite": "^7.0.4"
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
   }
 }
 </file>
@@ -2844,6 +2829,40 @@ fn get_clipboard_text() -> Option<String> {
         
         Some(text)
     }
+}
+</file>
+
+<file path="package.json">
+{
+  "name": "tauri-app",
+  "private": true,
+  "version": "0.1.1-alpha.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "repomix": "repomix",
+    "version:alpha": "npm version prerelease --preid=alpha",
+    "version:beta": "npm version prerelease --preid=beta",
+    "version": "node scripts/sync-version.js && git add src-tauri/Cargo.toml src-tauri/tauri.conf.json CHANGELOG.md"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-opener": "^2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "repomix": "^1.16.0",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4"
+  }
 }
 </file>
 

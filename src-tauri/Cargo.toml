@@ -1,6 +1,6 @@
 [package]
 name = "swifttype"
-version = "0.1.0"
+version = "0.1.1-alpha.0"
 description = "SwiftType - A Modern Text Expander"
 authors = ["SwiftType"]
 edition = "2021"
