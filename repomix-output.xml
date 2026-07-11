@@ -1212,100 +1212,6 @@ MIT License
 }
 </file>
 
-<file path="src/components/layout/Sidebar.tsx">
-import { useMemo } from "react";
-import { SidebarProps } from "../../types";
-
-export function Sidebar({ activeTab, setActiveTab, snippets, onNewSnippet }: SidebarProps) {
-  
-  const collections = useMemo(() => {
-    const cats = new Set(
-      snippets
-        .filter(s => !s.deleted_at)
-        .map(s => s.category || "General")
-    );
-    return Array.from(cats).sort();
-  }, [snippets]);
-
-  return (
-    <aside className="sidebar">
-      <div className="sidebar-header">
-        <div className="sidebar-logo">⚡</div>
-        <h1 className="sidebar-title">SwiftType</h1>
-      </div>
-
-      <div className="sidebar-new-btn-wrapper">
-        <button 
-          className="btn btn-primary sidebar-new-btn" 
-          onClick={onNewSnippet}
-        >
-          <span className="material-symbols-outlined sidebar-icon">add</span>
-          New Snippet
-        </button>
-      </div>
-
-      <nav className="sidebar-nav">
-        <div
-          className={`nav-item ${activeTab === "snippets" ? "active" : ""}`}
-          onClick={() => setActiveTab("snippets")}
-        >
-          <span className="material-symbols-outlined sidebar-icon">description</span>
-          <span>All Snippets</span>
-        </div>
-        <div 
-          className={`nav-item ${activeTab === "favorites" ? "active" : ""}`}
-          onClick={() => setActiveTab("favorites")}
-        >
-          <span className="material-symbols-outlined sidebar-icon">star</span>
-          <span>Favorites</span>
-        </div>
-        
-        <div 
-          className={`nav-item ${activeTab === "trash" ? "active" : ""}`}
-          onClick={() => setActiveTab("trash")}
-        >
-          <span className="material-symbols-outlined sidebar-icon">delete</span>
-          <span>Trash</span>
-        </div>
-
-        <div className="sidebar-divider"></div>
-        
-        <div className="nav-item" style={{ pointerEvents: 'none', opacity: 0.7, marginTop: '0.5rem' }}>
-          <span className="material-symbols-outlined sidebar-icon">folder</span>
-          <span style={{ fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Collections</span>
-        </div>
-        
-        {collections.length === 0 && (
-           <div className="nav-item" style={{ paddingLeft: '2.5rem', opacity: 0.5, pointerEvents: 'none' }}>
-             <span style={{ fontSize: '0.85rem' }}>No collections yet</span>
-           </div>
-        )}
-        
-        {collections.map(col => (
-          <div 
-            key={col}
-            className={`nav-item ${activeTab === `collection:${col}` ? "active" : ""}`}
-            onClick={() => setActiveTab(`collection:${col}`)}
-            style={{ paddingLeft: '2.5rem' }}
-          >
-            <span className="material-symbols-outlined sidebar-icon" style={{ fontSize: '18px' }}>folder_open</span>
-            <span>{col}</span>
-          </div>
-        ))}
-        
-      </nav>
-        
-      <div className="sidebar-bottom">
-        <div className="nav-item">
-          <span className="material-symbols-outlined sidebar-icon-small">help</span>
-          <span className="sidebar-text-small">Help</span>
-        </div>
-      </div>
-    </aside>
-  );
-}
-</file>
-
 <file path="src/components/modals/SnippetEditor.tsx">
 import React, { useState } from "react";
 import { Snippet, SnippetEditorProps } from "../../types";
@@ -1514,190 +1420,6 @@ export function SnippetEditor({ snippet, existingCategories, onSave, onClose }: 
           </div>
           </div>
         </form>
-      </div>
-    </>
-  );
-}
-</file>
-
-<file path="src/components/views/SnippetsView.tsx">
-import { useState, useMemo } from "react";
-import { SnippetsViewProps } from "../../types";
-import { IconButton } from "../ui/IconButton";
-
-export function SnippetsView({ activeTab, snippets, onEdit, onDelete, onUpdate }: SnippetsViewProps) {
-  const [sortBy, setSortBy] = useState<"name-asc" | "name-desc" | "usage-desc" | "updated-desc">("updated-desc");
-
-  const filteredAndSortedSnippets = useMemo(() => {
-    let filtered = snippets.filter(s => {
-      if (activeTab === "trash") return !!s.deleted_at;
-      if (activeTab === "favorites") return s.is_favorite && !s.deleted_at;
-      if (activeTab.startsWith("collection:")) {
-        const col = activeTab.split(":")[1];
-        const snippetCat = s.category || "General";
-        return snippetCat === col && !s.deleted_at;
-      }
-      return !s.deleted_at;
-    });
-    
-    return filtered.sort((a, b) => {
-      switch (sortBy) {
-        case "name-asc":
-          return (a.label || a.id).localeCompare(b.label || b.id);
-        case "name-desc":
-          return (b.label || b.id).localeCompare(a.label || a.id);
-        case "usage-desc":
-          return (b.usage_count || 0) - (a.usage_count || 0);
-        case "updated-desc":
-          return (b.updated_at || 0) - (a.updated_at || 0);
-        default:
-          return 0;
-      }
-    });
-  }, [snippets, activeTab, sortBy]);
-
-  const getCategoryClass = (category?: string | null) => {
-    switch (category?.toLowerCase()) {
-      case 'communication': return 'category-communication';
-      case 'development': return 'category-development';
-      default: return 'category-general';
-    }
-  };
-
-  const formatTimeAgo = (timestamp?: number | null) => {
-    if (!timestamp) return 'Never';
-    const seconds = Math.floor(Date.now() / 1000) - timestamp;
-    if (seconds < 60) return 'Just now';
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-    return `${Math.floor(seconds / 86400)}d ago`;
-  };
-
-  let title = "All Snippets";
-  let description = "Manage and organize your reusable text blocks.";
-  if (activeTab === "favorites") {
-    title = "Favorites";
-    description = "Your starred and most important snippets.";
-  } else if (activeTab === "trash") {
-    title = "Trash";
-    description = "Deleted snippets. They will be permanently removed eventually.";
-  } else if (activeTab.startsWith("collection:")) {
-    title = activeTab.split(":")[1];
-    description = `Snippets in the ${title} collection.`;
-  }
-
-  return (
-    <>
-      <div className="content-area content-area-padded">
-        <div className="view-header">
-          <div>
-            <h2 className="header-title">{title}</h2>
-            <p className="view-description">{description}</p>
-          </div>
-          <div className="view-actions" style={{ display: 'flex', gap: '8px' }}>
-            <select 
-              value={sortBy} 
-              onChange={e => setSortBy(e.target.value as any)}
-              className="form-input"
-              style={{ width: 'auto', minWidth: '120px', padding: '4px 8px', fontSize: '13px', height: '32px' }}
-            >
-              <option value="updated-desc">Recently Updated</option>
-              <option value="usage-desc">Most Used</option>
-              <option value="name-asc">Name (A-Z)</option>
-              <option value="name-desc">Name (Z-A)</option>
-            </select>
-          </div>
-        </div>
-
-        {filteredAndSortedSnippets.length > 0 ? (
-          <div className="snippet-grid snippet-grid-mt">
-            {filteredAndSortedSnippets.map((snippet) => (
-              <div
-                key={snippet.id}
-                className="snippet-card"
-                onClick={() => onEdit(snippet)}
-              >
-                <div className="card-indicator"></div>
-                
-                <div className="snippet-card-header">
-                  <h3 className="snippet-card-title">
-                    {snippet.label || snippet.id}
-                  </h3>
-                  <div className="snippet-card-actions">
-                    {activeTab === "trash" ? (
-                      <>
-                        <IconButton
-                          icon={<span className="material-symbols-outlined icon-sm">restore</span>}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onUpdate(snippet.id, { ...snippet, deleted_at: null });
-                          }}
-                        />
-                        <IconButton
-                          icon={<span className="material-symbols-outlined icon-sm">delete_forever</span>}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDelete(snippet.id);
-                          }}
-                        />
-                      </>
-                    ) : (
-                      <>
-                        <IconButton
-                          icon={<span className="material-symbols-outlined icon-sm" style={{ color: snippet.is_favorite ? '#eab308' : 'inherit' }}>{snippet.is_favorite ? 'star' : 'star_border'}</span>}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onUpdate(snippet.id, { ...snippet, is_favorite: !snippet.is_favorite });
-                          }}
-                        />
-                        <IconButton
-                          icon={<span className="material-symbols-outlined icon-sm">delete</span>}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDelete(snippet.id);
-                          }}
-                        />
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <div className="snippet-card-tags">
-                  <span className={`tag-chip ${getCategoryClass(snippet.category)}`}>
-                    {snippet.category || "General"}
-                  </span>
-                  <span className="trigger-chip">
-                    {snippet.trigger || snippet.regex || "No trigger"}
-                  </span>
-                </div>
-
-                <div className="snippet-content-box">
-                  {snippet.replace}
-                  <div className="snippet-content-fade"></div>
-                </div>
-
-                <div className="snippet-footer">
-                  <span>Used {snippet.usage_count || 0} times</span>
-                  <span>Updated {formatTimeAgo(snippet.updated_at)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="empty-state">
-            <div className="empty-state-icon">
-              <span className="material-symbols-outlined icon-lg">dataset</span>
-            </div>
-            <h3 className="empty-state-title">No snippets found</h3>
-            <p className="empty-state-text">
-              {activeTab === "trash" 
-                ? "Your trash is empty." 
-                : activeTab === "favorites" 
-                  ? "You haven't starred any snippets yet."
-                  : "Create your first snippet to get started."}
-            </p>
-          </div>
-        )}
       </div>
     </>
   );
@@ -2468,6 +2190,284 @@ strip = true
 @import './styles/EmptyState.css';
 </file>
 
+<file path="src/components/layout/Sidebar.tsx">
+import { useMemo } from "react";
+import { SidebarProps } from "../../types";
+
+export function Sidebar({ activeTab, setActiveTab, snippets, onNewSnippet }: SidebarProps) {
+  
+  const collections = useMemo(() => {
+    const cats = new Set(
+      snippets
+        .filter(s => !s.deleted_at)
+        .map(s => s.category || "General")
+    );
+    return Array.from(cats).sort();
+  }, [snippets]);
+
+  return (
+    <aside className="sidebar">
+      <div className="sidebar-header">
+        <div className="sidebar-logo">⚡</div>
+        <h1 className="sidebar-title">SwiftType</h1>
+      </div>
+
+      <div className="sidebar-new-btn-wrapper">
+        <button 
+          className="btn btn-primary sidebar-new-btn" 
+          onClick={onNewSnippet}
+        >
+          <span className="material-symbols-outlined sidebar-icon">add</span>
+          New Snippet
+        </button>
+      </div>
+
+      <nav className="sidebar-nav">
+        <div
+          className={`nav-item ${activeTab === "snippets" ? "active" : ""}`}
+          onClick={() => setActiveTab("snippets")}
+        >
+          <span className="material-symbols-outlined sidebar-icon">description</span>
+          <span>All Snippets</span>
+        </div>
+        <div 
+          className={`nav-item ${activeTab === "favorites" ? "active" : ""}`}
+          onClick={() => setActiveTab("favorites")}
+        >
+          <span className="material-symbols-outlined sidebar-icon">star</span>
+          <span>Favorites</span>
+        </div>
+        
+        <div 
+          className={`nav-item ${activeTab === "trash" ? "active" : ""}`}
+          onClick={() => setActiveTab("trash")}
+        >
+          <span className="material-symbols-outlined sidebar-icon">delete</span>
+          <span>Trash</span>
+        </div>
+
+        <div className="sidebar-divider"></div>
+        
+        <div className="nav-item" style={{ pointerEvents: 'none', opacity: 0.7, marginTop: '0.5rem' }}>
+          <span className="material-symbols-outlined sidebar-icon">folder</span>
+          <span style={{ fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Collections</span>
+        </div>
+        
+        {collections.length === 0 && (
+           <div className="nav-item" style={{ paddingLeft: '2.5rem', opacity: 0.5, pointerEvents: 'none' }}>
+             <span style={{ fontSize: '0.85rem' }}>No collections yet</span>
+           </div>
+        )}
+        
+        {collections.map(col => (
+          <div 
+            key={col}
+            className={`nav-item ${activeTab === `collection:${col}` ? "active" : ""}`}
+            onClick={() => setActiveTab(`collection:${col}`)}
+            style={{ paddingLeft: '2.5rem' }}
+          >
+            <span className="material-symbols-outlined sidebar-icon" style={{ fontSize: '18px' }}>folder_open</span>
+            <span>{col}</span>
+          </div>
+        ))}
+        
+      </nav>
+        
+      <div className="sidebar-bottom">
+        <div className="nav-item">
+          <span className="material-symbols-outlined sidebar-icon-small">help</span>
+          <span className="sidebar-text-small">Help</span>
+        </div>
+      </div>
+    </aside>
+  );
+}
+</file>
+
+<file path="src/components/views/SnippetsView.tsx">
+import { useState, useMemo } from "react";
+import { SnippetsViewProps } from "../../types";
+import { IconButton } from "../ui/IconButton";
+
+export function SnippetsView({ activeTab, snippets, onEdit, onDelete, onUpdate }: SnippetsViewProps) {
+  const [sortBy, setSortBy] = useState<"name-asc" | "name-desc" | "usage-desc" | "updated-desc">("updated-desc");
+
+  const filteredAndSortedSnippets = useMemo(() => {
+    let filtered = snippets.filter(s => {
+      if (activeTab === "trash") return !!s.deleted_at;
+      if (activeTab === "favorites") return s.is_favorite && !s.deleted_at;
+      if (activeTab.startsWith("collection:")) {
+        const col = activeTab.split(":")[1];
+        const snippetCat = s.category || "General";
+        return snippetCat === col && !s.deleted_at;
+      }
+      return !s.deleted_at;
+    });
+    
+    return filtered.sort((a, b) => {
+      switch (sortBy) {
+        case "name-asc":
+          return (a.label || a.id).localeCompare(b.label || b.id);
+        case "name-desc":
+          return (b.label || b.id).localeCompare(a.label || a.id);
+        case "usage-desc":
+          return (b.usage_count || 0) - (a.usage_count || 0);
+        case "updated-desc":
+          return (b.updated_at || 0) - (a.updated_at || 0);
+        default:
+          return 0;
+      }
+    });
+  }, [snippets, activeTab, sortBy]);
+
+  const getCategoryClass = (category?: string | null) => {
+    switch (category?.toLowerCase()) {
+      case 'communication': return 'category-communication';
+      case 'development': return 'category-development';
+      default: return 'category-general';
+    }
+  };
+
+  const formatTimeAgo = (timestamp?: number | null) => {
+    if (!timestamp) return 'Never';
+    const seconds = Math.floor(Date.now() / 1000) - timestamp;
+    if (seconds < 60) return 'Just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    return `${Math.floor(seconds / 86400)}d ago`;
+  };
+
+  let title = "All Snippets";
+  let description = "Manage and organize your reusable text blocks.";
+  if (activeTab === "favorites") {
+    title = "Favorites";
+    description = "Your starred and most important snippets.";
+  } else if (activeTab === "trash") {
+    title = "Trash";
+    description = "Deleted snippets. They will be permanently removed eventually.";
+  } else if (activeTab.startsWith("collection:")) {
+    title = activeTab.split(":")[1];
+    description = `Snippets in the ${title} collection.`;
+  }
+
+  return (
+    <>
+      <div className="content-area content-area-padded">
+        <div className="view-header">
+          <div>
+            <h2 className="header-title">{title}</h2>
+            <p className="view-description">{description}</p>
+          </div>
+          <div className="view-actions" style={{ display: 'flex', gap: '8px' }}>
+            <select 
+              value={sortBy} 
+              onChange={e => setSortBy(e.target.value as any)}
+              className="form-input"
+              style={{ width: 'auto', minWidth: '120px', padding: '4px 8px', fontSize: '13px', height: '32px' }}
+            >
+              <option value="updated-desc">Recently Updated</option>
+              <option value="usage-desc">Most Used</option>
+              <option value="name-asc">Name (A-Z)</option>
+              <option value="name-desc">Name (Z-A)</option>
+            </select>
+          </div>
+        </div>
+
+        {filteredAndSortedSnippets.length > 0 ? (
+          <div className="snippet-grid snippet-grid-mt">
+            {filteredAndSortedSnippets.map((snippet) => (
+              <div
+                key={snippet.id}
+                className="snippet-card"
+                onClick={() => onEdit(snippet)}
+              >
+                <div className="card-indicator"></div>
+                
+                <div className="snippet-card-header">
+                  <h3 className="snippet-card-title">
+                    {snippet.label || snippet.id}
+                  </h3>
+                  <div className="snippet-card-actions">
+                    {activeTab === "trash" ? (
+                      <>
+                        <IconButton
+                          icon={<span className="material-symbols-outlined icon-sm">restore</span>}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onUpdate(snippet.id, { ...snippet, deleted_at: null });
+                          }}
+                        />
+                        <IconButton
+                          icon={<span className="material-symbols-outlined icon-sm">delete_forever</span>}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(snippet.id);
+                          }}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <IconButton
+                          icon={<span className="material-symbols-outlined icon-sm" style={{ color: snippet.is_favorite ? '#eab308' : 'inherit' }}>{snippet.is_favorite ? 'star' : 'star_border'}</span>}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onUpdate(snippet.id, { ...snippet, is_favorite: !snippet.is_favorite });
+                          }}
+                        />
+                        <IconButton
+                          icon={<span className="material-symbols-outlined icon-sm">delete</span>}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(snippet.id);
+                          }}
+                        />
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="snippet-card-tags">
+                  <span className={`tag-chip ${getCategoryClass(snippet.category)}`}>
+                    {snippet.category || "General"}
+                  </span>
+                  <span className="trigger-chip">
+                    {snippet.trigger || snippet.regex || "No trigger"}
+                  </span>
+                </div>
+
+                <div className="snippet-content-box">
+                  {snippet.replace}
+                  <div className="snippet-content-fade"></div>
+                </div>
+
+                <div className="snippet-footer">
+                  <span>Used {snippet.usage_count || 0} times</span>
+                  <span>Updated {formatTimeAgo(snippet.updated_at)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state">
+            <div className="empty-state-icon">
+              <span className="material-symbols-outlined icon-lg">dataset</span>
+            </div>
+            <h3 className="empty-state-title">No snippets found</h3>
+            <p className="empty-state-text">
+              {activeTab === "trash" 
+                ? "Your trash is empty." 
+                : activeTab === "favorites" 
+                  ? "You haven't starred any snippets yet."
+                  : "Create your first snippet to get started."}
+            </p>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+</file>
+
 <file path="src-tauri/src/text_injector.rs">
 //! Text Injector Module
 //!
@@ -3224,6 +3224,251 @@ function App() {
 export default App;
 </file>
 
+<file path="package.json">
+{
+  "name": "tauri-app",
+  "private": true,
+  "version": "0.1.1-alpha.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "repomix": "repomix",
+    "version:alpha": "npm version prerelease --preid=alpha",
+    "version:beta": "npm version prerelease --preid=beta",
+    "version": "node scripts/sync-version.js && git add src-tauri/Cargo.toml src-tauri/tauri.conf.json CHANGELOG.md"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-autostart": "^2.5.1",
+    "@tauri-apps/plugin-dialog": "^2.7.1",
+    "@tauri-apps/plugin-opener": "^2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "repomix": "^1.16.0",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4"
+  }
+}
+</file>
+
+<file path="src-tauri/src/keyboard_hook.rs">
+//! Keyboard Hook Module
+//!
+//! Implements a global low-level keyboard hook using Windows API
+//! to capture keystrokes for text expansion functionality.
+
+use once_cell::sync::Lazy;
+use once_cell::sync::OnceCell;
+use parking_lot::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::Sender;
+use windows::Win32::Foundation::{HINSTANCE, LPARAM, LRESULT, WPARAM};
+use windows::Win32::UI::WindowsAndMessaging::{
+    CallNextHookEx, SetWindowsHookExW, UnhookWindowsHookEx, HC_ACTION, HHOOK, KBDLLHOOKSTRUCT,
+    LLKHF_INJECTED, LLKHF_LOWER_IL_INJECTED, WH_KEYBOARD_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
+};
+
+/// Keyboard event sent to the worker thread
+#[derive(Debug, Clone, Copy)]
+pub enum HookEvent {
+    Char(char),
+    Backspace,
+    Clear,
+}
+
+/// Wrapper for HHOOK to make it Send + Sync safe
+struct SendHHOOK(HHOOK);
+unsafe impl Send for SendHHOOK {}
+unsafe impl Sync for SendHHOOK {}
+
+/// Global hook handle
+static HOOK_HANDLE: Lazy<Mutex<Option<SendHHOOK>>> = Lazy::new(|| Mutex::new(None));
+
+/// Global sender for passing keystrokes to the worker thread
+static HOOK_SENDER: OnceCell<Sender<HookEvent>> = OnceCell::new();
+
+/// Flag to indicate if we're currently injecting text (to avoid recursive hooks)
+static IS_INJECTING: AtomicBool = AtomicBool::new(false);
+
+/// Virtual key codes for printable characters
+const VK_BACK: u32 = 0x08;
+const VK_RETURN: u32 = 0x0D;
+const VK_TAB: u32 = 0x09;
+const VK_ESCAPE: u32 = 0x1B;
+
+/// Set the channel sender for keyboard events
+pub fn set_event_sender(sender: Sender<HookEvent>) -> Result<(), &'static str> {
+    HOOK_SENDER.set(sender).map_err(|_| "Sender already set")
+}
+
+/// Set the injecting flag to prevent hook recursion
+pub fn set_injecting(value: bool) {
+    IS_INJECTING.store(value, Ordering::SeqCst);
+}
+
+/// Check if we're currently injecting
+pub fn is_injecting() -> bool {
+    IS_INJECTING.load(Ordering::SeqCst)
+}
+
+/// Convert virtual key code to character using current keyboard layout
+fn vk_to_char(vk_code: u32, scan_code: u32) -> Option<char> {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{
+        GetAsyncKeyState, GetKeyboardState, ToUnicode,
+    };
+
+    let mut keyboard_state = [0u8; 256];
+    let _ = unsafe { GetKeyboardState(&mut keyboard_state) };
+
+    const VK_SHIFT: i32 = 0x10;
+    const VK_CONTROL: i32 = 0x11;
+    const VK_MENU: i32 = 0x12;
+    const VK_CAPITAL: i32 = 0x14;
+
+    unsafe {
+        // High bit for pressed state
+        keyboard_state[VK_SHIFT as usize] = if GetAsyncKeyState(VK_SHIFT) < 0 {
+            0x80
+        } else {
+            0
+        };
+        keyboard_state[VK_CONTROL as usize] = if GetAsyncKeyState(VK_CONTROL) < 0 {
+            0x80
+        } else {
+            0
+        };
+        keyboard_state[VK_MENU as usize] = if GetAsyncKeyState(VK_MENU) < 0 {
+            0x80
+        } else {
+            0
+        };
+
+        // Low bit for toggled state (CapsLock)
+        let caps_state = GetAsyncKeyState(VK_CAPITAL);
+        keyboard_state[VK_CAPITAL as usize] = if (caps_state & 1) != 0 { 1 } else { 0 };
+    }
+
+    let mut buffer = [0u16; 4];
+    let result = unsafe { ToUnicode(vk_code, scan_code, Some(&keyboard_state), &mut buffer, 0) };
+
+    if result > 0 {
+        if let Ok(s) = String::from_utf16(&buffer[0..(result as usize)]) {
+            if let Some(ch) = s.chars().next() {
+                // Filter out non-printable / control characters
+                if !ch.is_control() {
+                    return Some(ch);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Low-level keyboard hook callback
+unsafe extern "system" fn keyboard_hook_callback(
+    n_code: i32,
+    w_param: WPARAM,
+    l_param: LPARAM,
+) -> LRESULT {
+    // If we're injecting, skip processing entirely - don't send to channel
+    if is_injecting() {
+        return CallNextHookEx(None, n_code, w_param, l_param);
+    }
+
+    if n_code == HC_ACTION as i32 {
+        let kbd_struct = &*(l_param.0 as *const KBDLLHOOKSTRUCT);
+
+        // Also skip injected keys from any process (belt + suspenders)
+        let flags = kbd_struct.flags.0;
+        if (flags & LLKHF_INJECTED.0) != 0 || (flags & LLKHF_LOWER_IL_INJECTED.0) != 0 {
+            return CallNextHookEx(None, n_code, w_param, l_param);
+        }
+
+        let msg_type = w_param.0 as u32;
+        if msg_type == WM_KEYDOWN || msg_type == WM_SYSKEYDOWN {
+            let vk_code = kbd_struct.vkCode;
+
+            match vk_code {
+                VK_BACK => {
+                    if let Some(sender) = HOOK_SENDER.get() {
+                        let _ = sender.send(HookEvent::Backspace);
+                    }
+                }
+                VK_RETURN | VK_ESCAPE | VK_TAB => {
+                    if let Some(sender) = HOOK_SENDER.get() {
+                        let _ = sender.send(HookEvent::Clear);
+                    }
+                }
+                _ => {
+                    let scan_code = kbd_struct.scanCode;
+                    if let Some(ch) = vk_to_char(vk_code, scan_code) {
+                        if let Some(sender) = HOOK_SENDER.get() {
+                            let _ = sender.send(HookEvent::Char(ch));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Always pass to the next hook. We never block keystrokes here to avoid deadlocks.
+    CallNextHookEx(None, n_code, w_param, l_param)
+}
+
+/// Install the keyboard hook
+pub fn install_hook() -> Result<(), String> {
+    let mut handle = HOOK_HANDLE.lock();
+
+    if handle.is_some() {
+        return Err("Hook already installed".to_string());
+    }
+
+    unsafe {
+        let hook = SetWindowsHookExW(
+            WH_KEYBOARD_LL,
+            Some(keyboard_hook_callback),
+            HINSTANCE::default(),
+            0,
+        )
+        .map_err(|e| format!("Failed to install hook: {:?}", e))?;
+
+        *handle = Some(SendHHOOK(hook));
+    }
+
+    log::info!("Keyboard hook installed successfully");
+    Ok(())
+}
+
+/// Uninstall the keyboard hook
+#[allow(dead_code)]
+pub fn uninstall_hook() -> Result<(), String> {
+    let mut handle = HOOK_HANDLE.lock();
+
+    if let Some(SendHHOOK(hook)) = handle.take() {
+        unsafe {
+            UnhookWindowsHookEx(hook).map_err(|e| format!("Failed to uninstall hook: {:?}", e))?;
+        }
+        log::info!("Keyboard hook uninstalled");
+    }
+
+    Ok(())
+}
+
+/// Check if hook is installed
+pub fn is_hook_installed() -> bool {
+    HOOK_HANDLE.lock().is_some()
+}
+</file>
+
 <file path="src/components/views/SettingsView.tsx">
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -3518,251 +3763,6 @@ export function SettingsView({ settings, onSave }: SettingsViewProps) {
       </div>
     </>
   );
-}
-</file>
-
-<file path="package.json">
-{
-  "name": "tauri-app",
-  "private": true,
-  "version": "0.1.1-alpha.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
-    "tauri": "tauri",
-    "repomix": "repomix",
-    "version:alpha": "npm version prerelease --preid=alpha",
-    "version:beta": "npm version prerelease --preid=beta",
-    "version": "node scripts/sync-version.js && git add src-tauri/Cargo.toml src-tauri/tauri.conf.json CHANGELOG.md"
-  },
-  "dependencies": {
-    "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-autostart": "^2.5.1",
-    "@tauri-apps/plugin-dialog": "^2.7.1",
-    "@tauri-apps/plugin-opener": "^2",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0"
-  },
-  "devDependencies": {
-    "@tauri-apps/cli": "^2",
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
-    "@vitejs/plugin-react": "^4.6.0",
-    "repomix": "^1.16.0",
-    "typescript": "~5.8.3",
-    "vite": "^7.0.4"
-  }
-}
-</file>
-
-<file path="src-tauri/src/keyboard_hook.rs">
-//! Keyboard Hook Module
-//!
-//! Implements a global low-level keyboard hook using Windows API
-//! to capture keystrokes for text expansion functionality.
-
-use once_cell::sync::Lazy;
-use once_cell::sync::OnceCell;
-use parking_lot::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::Sender;
-use windows::Win32::Foundation::{HINSTANCE, LPARAM, LRESULT, WPARAM};
-use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, SetWindowsHookExW, UnhookWindowsHookEx, HC_ACTION, HHOOK, KBDLLHOOKSTRUCT,
-    LLKHF_INJECTED, LLKHF_LOWER_IL_INJECTED, WH_KEYBOARD_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
-};
-
-/// Keyboard event sent to the worker thread
-#[derive(Debug, Clone, Copy)]
-pub enum HookEvent {
-    Char(char),
-    Backspace,
-    Clear,
-}
-
-/// Wrapper for HHOOK to make it Send + Sync safe
-struct SendHHOOK(HHOOK);
-unsafe impl Send for SendHHOOK {}
-unsafe impl Sync for SendHHOOK {}
-
-/// Global hook handle
-static HOOK_HANDLE: Lazy<Mutex<Option<SendHHOOK>>> = Lazy::new(|| Mutex::new(None));
-
-/// Global sender for passing keystrokes to the worker thread
-static HOOK_SENDER: OnceCell<Sender<HookEvent>> = OnceCell::new();
-
-/// Flag to indicate if we're currently injecting text (to avoid recursive hooks)
-static IS_INJECTING: AtomicBool = AtomicBool::new(false);
-
-/// Virtual key codes for printable characters
-const VK_BACK: u32 = 0x08;
-const VK_RETURN: u32 = 0x0D;
-const VK_TAB: u32 = 0x09;
-const VK_ESCAPE: u32 = 0x1B;
-
-/// Set the channel sender for keyboard events
-pub fn set_event_sender(sender: Sender<HookEvent>) -> Result<(), &'static str> {
-    HOOK_SENDER.set(sender).map_err(|_| "Sender already set")
-}
-
-/// Set the injecting flag to prevent hook recursion
-pub fn set_injecting(value: bool) {
-    IS_INJECTING.store(value, Ordering::SeqCst);
-}
-
-/// Check if we're currently injecting
-pub fn is_injecting() -> bool {
-    IS_INJECTING.load(Ordering::SeqCst)
-}
-
-/// Convert virtual key code to character using current keyboard layout
-fn vk_to_char(vk_code: u32, scan_code: u32) -> Option<char> {
-    use windows::Win32::UI::Input::KeyboardAndMouse::{
-        GetAsyncKeyState, GetKeyboardState, ToUnicode,
-    };
-
-    let mut keyboard_state = [0u8; 256];
-    let _ = unsafe { GetKeyboardState(&mut keyboard_state) };
-
-    const VK_SHIFT: i32 = 0x10;
-    const VK_CONTROL: i32 = 0x11;
-    const VK_MENU: i32 = 0x12;
-    const VK_CAPITAL: i32 = 0x14;
-
-    unsafe {
-        // High bit for pressed state
-        keyboard_state[VK_SHIFT as usize] = if GetAsyncKeyState(VK_SHIFT) < 0 {
-            0x80
-        } else {
-            0
-        };
-        keyboard_state[VK_CONTROL as usize] = if GetAsyncKeyState(VK_CONTROL) < 0 {
-            0x80
-        } else {
-            0
-        };
-        keyboard_state[VK_MENU as usize] = if GetAsyncKeyState(VK_MENU) < 0 {
-            0x80
-        } else {
-            0
-        };
-
-        // Low bit for toggled state (CapsLock)
-        let caps_state = GetAsyncKeyState(VK_CAPITAL);
-        keyboard_state[VK_CAPITAL as usize] = if (caps_state & 1) != 0 { 1 } else { 0 };
-    }
-
-    let mut buffer = [0u16; 4];
-    let result = unsafe { ToUnicode(vk_code, scan_code, Some(&keyboard_state), &mut buffer, 0) };
-
-    if result > 0 {
-        if let Ok(s) = String::from_utf16(&buffer[0..(result as usize)]) {
-            if let Some(ch) = s.chars().next() {
-                // Filter out non-printable / control characters
-                if !ch.is_control() {
-                    return Some(ch);
-                }
-            }
-        }
-    }
-    None
-}
-
-/// Low-level keyboard hook callback
-unsafe extern "system" fn keyboard_hook_callback(
-    n_code: i32,
-    w_param: WPARAM,
-    l_param: LPARAM,
-) -> LRESULT {
-    // If we're injecting, skip processing entirely - don't send to channel
-    if is_injecting() {
-        return CallNextHookEx(None, n_code, w_param, l_param);
-    }
-
-    if n_code == HC_ACTION as i32 {
-        let kbd_struct = &*(l_param.0 as *const KBDLLHOOKSTRUCT);
-
-        // Also skip injected keys from any process (belt + suspenders)
-        let flags = kbd_struct.flags.0;
-        if (flags & LLKHF_INJECTED.0) != 0 || (flags & LLKHF_LOWER_IL_INJECTED.0) != 0 {
-            return CallNextHookEx(None, n_code, w_param, l_param);
-        }
-
-        let msg_type = w_param.0 as u32;
-        if msg_type == WM_KEYDOWN || msg_type == WM_SYSKEYDOWN {
-            let vk_code = kbd_struct.vkCode;
-
-            match vk_code {
-                VK_BACK => {
-                    if let Some(sender) = HOOK_SENDER.get() {
-                        let _ = sender.send(HookEvent::Backspace);
-                    }
-                }
-                VK_RETURN | VK_ESCAPE | VK_TAB => {
-                    if let Some(sender) = HOOK_SENDER.get() {
-                        let _ = sender.send(HookEvent::Clear);
-                    }
-                }
-                _ => {
-                    let scan_code = kbd_struct.scanCode;
-                    if let Some(ch) = vk_to_char(vk_code, scan_code) {
-                        if let Some(sender) = HOOK_SENDER.get() {
-                            let _ = sender.send(HookEvent::Char(ch));
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Always pass to the next hook. We never block keystrokes here to avoid deadlocks.
-    CallNextHookEx(None, n_code, w_param, l_param)
-}
-
-/// Install the keyboard hook
-pub fn install_hook() -> Result<(), String> {
-    let mut handle = HOOK_HANDLE.lock();
-
-    if handle.is_some() {
-        return Err("Hook already installed".to_string());
-    }
-
-    unsafe {
-        let hook = SetWindowsHookExW(
-            WH_KEYBOARD_LL,
-            Some(keyboard_hook_callback),
-            HINSTANCE::default(),
-            0,
-        )
-        .map_err(|e| format!("Failed to install hook: {:?}", e))?;
-
-        *handle = Some(SendHHOOK(hook));
-    }
-
-    log::info!("Keyboard hook installed successfully");
-    Ok(())
-}
-
-/// Uninstall the keyboard hook
-#[allow(dead_code)]
-pub fn uninstall_hook() -> Result<(), String> {
-    let mut handle = HOOK_HANDLE.lock();
-
-    if let Some(SendHHOOK(hook)) = handle.take() {
-        unsafe {
-            UnhookWindowsHookEx(hook).map_err(|e| format!("Failed to uninstall hook: {:?}", e))?;
-        }
-        log::info!("Keyboard hook uninstalled");
-    }
-
-    Ok(())
-}
-
-/// Check if hook is installed
-pub fn is_hook_installed() -> bool {
-    HOOK_HANDLE.lock().is_some()
 }
 </file>
 

@@ -49,8 +49,8 @@ export function SettingsView({ settings, onSave }: SettingsViewProps) {
         multiple: false,
       });
       if (filePath) {
-        const merge = window.confirm("Do you want to MERGE these snippets with your existing ones?\n\n(Click 'OK' to MERGE, click 'Cancel' to OVERWRITE)");
-        await invoke("import_snippets", { path: filePath, merge });
+        const merge = await confirm("Do you want to MERGE these snippets with your existing ones?\n\n(Click 'OK' to MERGE, click 'Cancel' to OVERWRITE)");
+        await invoke("import_snippets", { path: String(filePath), merge: merge === true });
         onSave(); // trigger data reload
         alert("Snippets imported successfully!");
       }
