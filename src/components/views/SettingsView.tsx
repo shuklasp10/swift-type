@@ -60,6 +60,22 @@ export function SettingsView({ settings, onSave }: SettingsViewProps) {
     }
   };
 
+  const handleEraseAll = async () => {
+    const confirmErase = window.confirm(
+      "DANGER: Are you absolutely sure you want to completely erase all your snippets and reset settings to their defaults?\n\nThis cannot be undone."
+    );
+    if (confirmErase) {
+      try {
+        await invoke("clear_all_data");
+        onSave(); // refresh data
+        alert("All data has been successfully erased.");
+      } catch (err) {
+        console.error("Failed to erase data:", err);
+        alert("Failed to erase data.");
+      }
+    }
+  };
+
   const scrollToSection = (id: "behavior" | "data" | "appearance") => {
     setActiveSection(id);
     const element = document.getElementById(`section-${id}`);
@@ -249,6 +265,24 @@ export function SettingsView({ settings, onSave }: SettingsViewProps) {
                   <option value="light">Light</option>
                   <option value="system">System</option>
                 </select>
+              </div>
+            </div>
+
+            {/* Danger Zone Card */}
+            <div id="section-danger" className="settings-card danger-card">
+              <div className="settings-card-header danger-card-header">
+                <span className="material-symbols-outlined danger-icon">error</span>
+                <h3 className="settings-card-title danger-title">Danger Zone</h3>
+              </div>
+
+              <div className="settings-row danger-row">
+                <div className="settings-row-info">
+                  <h4 className="danger-row-title">Delete All Data</h4>
+                  <p>Permanently delete all local snippets and reset application settings. This action cannot be undone.</p>
+                </div>
+                <Button variant="secondary" className="action-btn-danger" onClick={handleEraseAll}>
+                  Reset All
+                </Button>
               </div>
             </div>
             

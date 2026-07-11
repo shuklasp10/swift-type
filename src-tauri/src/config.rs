@@ -253,7 +253,9 @@ impl ConfigManager {
         } else {
             self.config = imported_config;
         }
-        self.save_config()
+        
+        self.save_config()?;
+        Ok(())
     }
 
     /// Save settings to disk
@@ -263,6 +265,15 @@ impl ConfigManager {
             .map_err(|e| format!("Failed to serialize settings: {}", e))?;
         std::fs::write(&settings_path, content)
             .map_err(|e| format!("Failed to write settings file: {}", e))?;
+        Ok(())
+    }
+
+    /// Clear all data and reset to defaults
+    pub fn clear_all_data(&mut self) -> Result<(), String> {
+        self.config.matches.clear();
+        self.settings = AppSettings::default();
+        self.save_config()?;
+        self.save_settings()?;
         Ok(())
     }
 

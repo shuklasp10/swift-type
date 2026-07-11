@@ -400,7 +400,8 @@ fn main() {
     "main"
   ],
   "permissions": [
-    "autostart:default"
+    "autostart:default",
+    "dialog:default"
   ]
 }
 </file>
@@ -890,7 +891,7 @@ body {
 
 .action-btn-danger {
   color: var(--error-color);
-  border-color: transparent;
+  border: 1px solid var(--error-color);
   background: transparent;
 }
 
@@ -942,6 +943,42 @@ input[type="range"].range-slider::-webkit-slider-thumb {
 
 input[type="range"].range-slider::-webkit-slider-thumb:hover {
   transform: scale(1.1);
+}
+
+/* Danger Zone Custom Styles */
+.danger-card {
+  border: 1px solid var(--error-color) !important;
+}
+
+.danger-card-header {
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+.danger-icon,
+.danger-title {
+  color: var(--error-color) !important;
+}
+
+.danger-title {
+  font-size: 1.25rem !important;
+}
+
+.danger-row {
+  border-top: none !important;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.danger-row-title {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.action-btn-danger {
+  min-width: fit-content;
+  margin-left: 0.5rem;
 }
 </file>
 
@@ -1296,6 +1333,7 @@ input[type="range"].range-slider::-webkit-slider-thumb:hover {
   --success-text: #137333;
   --error-bg: #fce8e6;
   --error-text: #c5221f;
+  --error-color: #ef4444;
 
   /* Spacing Rhythm (4px/8px) */
   --space-xs: 4px;
@@ -1920,6 +1958,22 @@ export function SettingsView({ settings, onSave }: SettingsViewProps) {
     }
   };
 
+  const handleEraseAll = async () => {
+    const confirmErase = window.confirm(
+      "DANGER: Are you absolutely sure you want to completely erase all your snippets and reset settings to their defaults?\n\nThis cannot be undone."
+    );
+    if (confirmErase) {
+      try {
+        await invoke("clear_all_data");
+        onSave(); // refresh data
+        alert("All data has been successfully erased.");
+      } catch (err) {
+        console.error("Failed to erase data:", err);
+        alert("Failed to erase data.");
+      }
+    }
+  };
+
   const scrollToSection = (id: "behavior" | "data" | "appearance") => {
     setActiveSection(id);
     const element = document.getElementById(`section-${id}`);
@@ -2109,6 +2163,24 @@ export function SettingsView({ settings, onSave }: SettingsViewProps) {
                   <option value="light">Light</option>
                   <option value="system">System</option>
                 </select>
+              </div>
+            </div>
+
+            {/* Danger Zone Card */}
+            <div id="section-danger" className="settings-card danger-card">
+              <div className="settings-card-header danger-card-header">
+                <span className="material-symbols-outlined danger-icon">error</span>
+                <h3 className="settings-card-title danger-title">Danger Zone</h3>
+              </div>
+
+              <div className="settings-row danger-row">
+                <div className="settings-row-info">
+                  <h4 className="danger-row-title">Delete All Data</h4>
+                  <p>Permanently delete all local snippets and reset application settings. This action cannot be undone.</p>
+                </div>
+                <Button variant="secondary" className="action-btn-danger" onClick={handleEraseAll}>
+                  Reset All
+                </Button>
               </div>
             </div>
             
@@ -2971,7 +3043,9 @@ impl ConfigManager {
         } else {
             self.config = imported_config;
         }
-        self.save_config()
+        
+        self.save_config()?;
+        Ok(())
     }
 
     /// Save settings to disk
@@ -2981,6 +3055,15 @@ impl ConfigManager {
             .map_err(|e| format!("Failed to serialize settings: {}", e))?;
         std::fs::write(&settings_path, content)
             .map_err(|e| format!("Failed to write settings file: {}", e))?;
+        Ok(())
+    }
+
+    /// Clear all data and reset to defaults
+    pub fn clear_all_data(&mut self) -> Result<(), String> {
+        self.config.matches.clear();
+        self.settings = AppSettings::default();
+        self.save_config()?;
+        self.save_settings()?;
         Ok(())
     }
 
@@ -4257,6 +4340,13 @@ fn update_settings(
     Ok(())
 }
 
+/// Clear all data and reset to defaults
+#[tauri::command]
+fn clear_all_data(state: State<AppState>) -> Result<(), String> {
+    let mut config = state.config.write();
+    config.clear_all_data()
+}
+
 // ============================================================================
 // Tauri Commands - Engine Control
 // ============================================================================
@@ -4491,6 +4581,7 @@ pub fn run() {
             // Settings
             get_settings,
             update_settings,
+            clear_all_data,
             // Engine
             get_engine_status,
             toggle_engine,

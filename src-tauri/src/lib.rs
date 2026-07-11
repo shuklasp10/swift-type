@@ -119,6 +119,13 @@ fn update_settings(
     Ok(())
 }
 
+/// Clear all data and reset to defaults
+#[tauri::command]
+fn clear_all_data(state: State<AppState>) -> Result<(), String> {
+    let mut config = state.config.write();
+    config.clear_all_data()
+}
+
 // ============================================================================
 // Tauri Commands - Engine Control
 // ============================================================================
@@ -353,6 +360,7 @@ pub fn run() {
             // Settings
             get_settings,
             update_settings,
+            clear_all_data,
             // Engine
             get_engine_status,
             toggle_engine,

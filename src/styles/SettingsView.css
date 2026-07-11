@@ -200,7 +200,7 @@
 
 .action-btn-danger {
   color: var(--error-color);
-  border-color: transparent;
+  border: 1px solid var(--error-color);
   background: transparent;
 }
 
@@ -252,4 +252,40 @@ input[type="range"].range-slider::-webkit-slider-thumb {
 
 input[type="range"].range-slider::-webkit-slider-thumb:hover {
   transform: scale(1.1);
+}
+
+/* Danger Zone Custom Styles */
+.danger-card {
+  border: 1px solid var(--error-color) !important;
+}
+
+.danger-card-header {
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+.danger-icon,
+.danger-title {
+  color: var(--error-color) !important;
+}
+
+.danger-title {
+  font-size: 1.25rem !important;
+}
+
+.danger-row {
+  border-top: none !important;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.danger-row-title {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.action-btn-danger {
+  min-width: fit-content;
+  margin-left: 0.5rem;
 }
