@@ -56,7 +56,7 @@ export function SettingsView({ settings, onSave }: SettingsViewProps) {
       }
     } catch (err) {
       console.error("Import failed:", err);
-      alert("Failed to import snippets.");
+      alert(`Failed to import snippets: ${err}`);
     }
   };
 

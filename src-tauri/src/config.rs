@@ -237,12 +237,21 @@ impl ConfigManager {
         Ok(())
     }
 
-    /// Import snippets config from a specific path
     pub fn import_data(&mut self, path: &str, merge: bool) -> Result<(), String> {
-        let content = std::fs::read_to_string(path)
-            .map_err(|e| format!("Failed to read import file: {}", e))?;
-        let imported_config: Config = serde_yaml::from_str(&content)
-            .map_err(|e| format!("Failed to parse imported config: {}", e))?;
+        log::info!("Attempting to import from path: {}", path);
+        let content = std::fs::read_to_string(path).map_err(|e| {
+            let err_msg = format!("Failed to read import file {}: {}", path, e);
+            log::error!("{}", err_msg);
+            // Alert user: Failed to import snippets
+            err_msg
+        })?;
+        
+        let imported_config: Config = serde_yaml::from_str(&content).map_err(|e| {
+            let err_msg = format!("Failed to parse imported config: {}", e);
+            log::error!("{}", err_msg);
+            // Alert user: Failed to import snippets
+            err_msg
+        })?;
         
         if merge {
             for snippet in imported_config.matches {
