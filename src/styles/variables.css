@@ -1,0 +1,78 @@
+:root {
+  /* Fluent Velocity Design System - Modular Values */
+
+  /* Colors - Light Theme (Default Windows 11 Vibe) */
+  --primary-color: #0067c0; /* Action Blue */
+  --primary-hover: #005eb1;
+  --on-primary: #ffffff;
+  
+  --bg-primary: #ffffff; /* Primary background */
+  --bg-secondary: #f3f3f3; /* Sidebar, search container */
+  --bg-tertiary: #f9f9f9; /* Mica substitute base */
+  
+  --text-primary: #1c1c1c;
+  --text-secondary: #616161;
+  --text-muted: #808080;
+  
+  --border-color: #e5e5e5;
+  --border-active: var(--primary-color);
+  
+  /* Glassmorphism / Mica */
+  --mica-bg: rgba(249, 249, 249, 0.7);
+  --backdrop-blur: blur(20px);
+  
+  /* Status Colors */
+  --success-bg: #e6f4ea;
+  --success-text: #137333;
+  --error-bg: #fce8e6;
+  --error-text: #c5221f;
+
+  /* Spacing Rhythm (4px/8px) */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --sidebar-width: 260px;
+  
+  /* Shapes */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+  
+  /* Typography */
+  --font-primary: 'Inter', sans-serif;
+  --font-heading: 'Hanken Grotesk', sans-serif;
+  --font-mono: 'Geist', monospace;
+  
+  /* Elevations / Depth */
+  --shadow-level-2: 0px 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-level-3: 0px 8px 16px rgba(0, 0, 0, 0.08);
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+}
+
+/* Dark Theme overrides */
+[data-theme="dark"] {
+  --primary-color: #a6c8ff;
+  --primary-hover: #dbe7ff;
+  --on-primary: #001c3b;
+
+  --bg-primary: #1b1b1b;
+  --bg-secondary: #2b2b2b;
+  --bg-tertiary: #333333;
+
+  --text-primary: #ffffff;
+  --text-secondary: #b3b3b3;
+  --text-muted: #808080;
+
+  --border-color: #404040;
+  --border-active: var(--primary-color);
+
+  --mica-bg: rgba(43, 43, 43, 0.7);
+  --shadow-level-2: 0px 2px 4px rgba(0, 0, 0, 0.2);
+  --shadow-level-3: 0px 8px 16px rgba(0, 0, 0, 0.3);
+}

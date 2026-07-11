@@ -62,7 +62,26 @@ src-tauri/src/trigger_engine.rs
 src-tauri/tauri.conf.json
 src/App.css
 src/App.tsx
+src/components/layout/Sidebar.tsx
+src/components/modals/SnippetEditor.tsx
+src/components/ui/Button.tsx
+src/components/ui/IconButton.tsx
+src/components/ui/Toggle.tsx
+src/components/views/SettingsView.tsx
+src/components/views/SnippetsView.tsx
 src/main.tsx
+src/styles/base.css
+src/styles/EmptyState.css
+src/styles/forms.css
+src/styles/SettingsView.css
+src/styles/Sidebar.css
+src/styles/SnippetEditor.css
+src/styles/SnippetsView.css
+src/styles/Toggle.css
+src/styles/TopBar.css
+src/styles/ui.css
+src/styles/variables.css
+src/types.ts
 src/vite-env.d.ts
 tsconfig.json
 tsconfig.node.json
@@ -71,6 +90,1701 @@ vite.config.ts
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="src/components/layout/Sidebar.tsx">
+import { SidebarProps } from "../../types";
+
+export function Sidebar({ activeTab, setActiveTab, onNewSnippet }: SidebarProps) {
+  return (
+    <aside className="sidebar">
+      <div className="sidebar-header">
+        <div className="sidebar-logo">⚡</div>
+        <h1 className="sidebar-title">SwiftType</h1>
+      </div>
+
+      <div className="sidebar-new-btn-wrapper">
+        <button 
+          className="btn btn-primary sidebar-new-btn" 
+          onClick={onNewSnippet}
+        >
+          <span className="material-symbols-outlined sidebar-icon">add</span>
+          New Snippet
+        </button>
+      </div>
+
+      <nav className="sidebar-nav">
+        <div
+          className={`nav-item ${activeTab === "snippets" ? "active" : ""}`}
+          onClick={() => setActiveTab("snippets")}
+        >
+          <span className="material-symbols-outlined sidebar-icon">description</span>
+          <span>All Snippets</span>
+        </div>
+        <div className="nav-item">
+          <span className="material-symbols-outlined sidebar-icon">star</span>
+          <span>Favorites</span>
+        </div>
+        <div className="nav-item">
+          <span className="material-symbols-outlined sidebar-icon">folder</span>
+          <span>Collections</span>
+        </div>
+        
+        <div className="sidebar-divider"></div>
+        
+        <div className="nav-item">
+          <span className="material-symbols-outlined sidebar-icon">delete</span>
+          <span>Trash</span>
+        </div>
+      </nav>
+        
+      <div className="sidebar-bottom">
+        <div className="nav-item">
+          <span className="material-symbols-outlined sidebar-icon-small">help</span>
+          <span className="sidebar-text-small">Help</span>
+        </div>
+      </div>
+    </aside>
+  );
+}
+</file>
+
+<file path="src/components/modals/SnippetEditor.tsx">
+import React, { useState } from "react";
+import { Snippet, SnippetEditorProps } from "../../types";
+import { Button } from "../ui/Button";
+
+
+export function SnippetEditor({ snippet, onSave, onClose }: SnippetEditorProps) {
+  const [trigger, setTrigger] = useState(snippet?.trigger || "");
+  const [replace, setReplace] = useState(snippet?.replace || "");
+  const [label, setLabel] = useState(snippet?.label || "");
+  const [useRegex, setUseRegex] = useState(!!snippet?.regex);
+  const [regex, setRegex] = useState(snippet?.regex || "");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newSnippet: Snippet = {
+      id: snippet?.id || `snip_${Date.now()}`,
+      trigger: useRegex ? null : trigger,
+      regex: useRegex ? regex : null,
+      replace,
+      label: label || null,
+      word: snippet?.word || false,
+      uppercase_style: snippet?.uppercase_style || null,
+      image_path: snippet?.image_path || null,
+      shell: snippet?.shell || null,
+      form_fields: snippet?.form_fields || null,
+      filter_app: snippet?.filter_app || null,
+    };
+    onSave(newSnippet);
+  };
+
+  return (
+    <>
+      <div className="content-area content-area-padded">
+        <div className="view-header">
+          <div>
+            <h2 className="header-title">
+              {snippet ? "Edit Snippet" : "Create Snippet"}
+            </h2>
+            <p className="view-description">
+              Define your shortcut and expansion text.
+            </p>
+          </div>
+        </div>
+        
+        <form onSubmit={handleSubmit}>
+          <div style={{ maxWidth: 600 }}>
+            <div className="form-group">
+              <label className="form-label">Label (optional)</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g., Email Signature"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <div className="form-group-header">
+                <label className="form-label mb-0">
+                  {useRegex ? "Regex Pattern" : "Trigger"}
+                </label>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={useRegex}
+                    onChange={(e) => setUseRegex(e.target.checked)}
+                  />
+                  Use Regex
+                </label>
+              </div>
+              <input
+                className="form-input font-mono"
+                placeholder={useRegex ? "e.g., :sig(\\d+)" : "e.g., :hello"}
+                value={useRegex ? regex : trigger}
+                onChange={(e) =>
+                  useRegex ? setRegex(e.target.value) : setTrigger(e.target.value)
+                }
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Replacement Text</label>
+              <textarea
+                className="form-input form-textarea"
+                placeholder="Enter the text to expand to..."
+                value={replace}
+                onChange={(e) => setReplace(e.target.value)}
+              />
+              <p className="form-hint">
+                Variables: {"{{date}}"}, {"{{time}}"}, {"{{clipboard}}"}, {"{{weekday}}"}
+              </p>
+            </div>
+          <div className="form-actions">
+            <Button type="button" variant="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary">
+              {snippet ? "Save Changes" : "Save Snippet"}
+            </Button>
+          </div>
+          </div>
+        </form>
+      </div>
+    </>
+  );
+}
+</file>
+
+<file path="src/components/ui/Button.tsx">
+import React from 'react';
+
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'primary' | 'secondary';
+  icon?: React.ReactNode;
+}
+
+export function Button({ variant = 'primary', icon, children, className = '', ...props }: ButtonProps) {
+  return (
+    <button className={`btn btn-${variant} ${className}`} {...props}>
+      {icon}
+      {children}
+    </button>
+  );
+}
+</file>
+
+<file path="src/components/ui/IconButton.tsx">
+import React from 'react';
+
+interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  icon: React.ReactNode;
+}
+
+export function IconButton({ icon, className = '', ...props }: IconButtonProps) {
+  return (
+    <button className={`btn-icon ${className}`} {...props}>
+      {icon}
+    </button>
+  );
+}
+</file>
+
+<file path="src/components/ui/Toggle.tsx">
+interface ToggleProps {
+  active: boolean;
+  onClick: () => void;
+  className?: string;
+}
+
+export function Toggle({ active, onClick, className = '' }: ToggleProps) {
+  return (
+    <div className={`toggle ${active ? "active" : ""} ${className}`} onClick={onClick}>
+      <div className="toggle-knob" />
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/views/SettingsView.tsx">
+import { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { AppSettings, SettingsViewProps } from "../../types";
+import { Button } from "../ui/Button";
+import { Toggle } from "../ui/Toggle";
+
+export function SettingsView({ settings, onSave }: SettingsViewProps) {
+  const [localSettings, setLocalSettings] = useState<AppSettings | null>(settings);
+  const [activeSection, setActiveSection] = useState<"behavior" | "data" | "appearance">("behavior");
+
+  useEffect(() => {
+    setLocalSettings(settings);
+  }, [settings]);
+
+  const updateSetting = async <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
+    if (!localSettings) return;
+    const newSettings = { ...localSettings, [key]: value };
+    setLocalSettings(newSettings); // Optimistic update
+    try {
+      await invoke("update_settings", { settings: newSettings });
+      onSave(); // Refresh parent state
+    } catch (err) {
+      console.error("Failed to save settings:", err);
+      setLocalSettings(localSettings); // Revert on failure
+    }
+  };
+
+  const scrollToSection = (id: "behavior" | "data" | "appearance") => {
+    setActiveSection(id);
+    const element = document.getElementById(`section-${id}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  if (!localSettings) {
+    return <div className="content-area">Loading...</div>;
+  }
+
+  return (
+    <>
+      <div className="content-area content-area-padded">
+        <div className="view-header">
+          <div>
+            <h2 className="header-title">Settings</h2>
+            <p className="view-description">
+              Manage your app behavior and data preferences.
+            </p>
+          </div>
+        </div>
+
+        <div className="settings-layout">
+          {/* Left Navigation */}
+          <nav className="settings-nav">
+            <button 
+              className={`settings-nav-item ${activeSection === "behavior" ? "active" : ""}`}
+              onClick={() => scrollToSection("behavior")}
+            >
+              <span className="material-symbols-outlined icon-md">tune</span>
+              App Behavior
+            </button>
+            <button 
+              className={`settings-nav-item ${activeSection === "data" ? "active" : ""}`}
+              onClick={() => scrollToSection("data")}
+            >
+              <span className="material-symbols-outlined icon-md">storage</span>
+              Data Management
+            </button>
+            <button 
+              className={`settings-nav-item ${activeSection === "appearance" ? "active" : ""}`}
+              onClick={() => scrollToSection("appearance")}
+            >
+              <span className="material-symbols-outlined icon-md">palette</span>
+              Appearance
+            </button>
+          </nav>
+
+          {/* Right Content */}
+          <div className="settings-content">
+            
+            {/* App Behavior Card */}
+            <div id="section-behavior" className="settings-card">
+              <div className="settings-card-header">
+                <span className="material-symbols-outlined icon-primary">tune</span>
+                <h3 className="settings-card-title">App Behavior</h3>
+              </div>
+
+              <div className="settings-row">
+                <div className="settings-row-info">
+                  <h4>Launch at Startup</h4>
+                  <p>Automatically open SnippetFlow when you log in.</p>
+                </div>
+                <Toggle
+                  active={localSettings.start_with_windows}
+                  onClick={() => updateSetting("start_with_windows", !localSettings.start_with_windows)}
+                />
+              </div>
+
+              <div className="settings-row" style={{ borderTop: "1px solid var(--border-color)" }}>
+                <div className="settings-row-info">
+                  <h4>Background Sync</h4>
+                  <p>Keep snippets updated in the background.</p>
+                </div>
+                <Toggle
+                  active={localSettings.show_in_tray}
+                  onClick={() => updateSetting("show_in_tray", !localSettings.show_in_tray)}
+                />
+              </div>
+
+              <div className="slider-container">
+                <div className="slider-header">
+                  <h4>Auto-Expansion Delay</h4>
+                  <span className="slider-value">{localSettings.undo_backspace_ms}ms</span>
+                </div>
+                <input 
+                  type="range" 
+                  className="range-slider" 
+                  min="0" max="1000" step="50"
+                  value={localSettings.undo_backspace_ms}
+                  onChange={(e) => updateSetting("undo_backspace_ms", parseInt(e.target.value))}
+                />
+                <div className="slider-labels">
+                  <span>Fast (0ms)</span>
+                  <span>Slow (1s)</span>
+                </div>
+              </div>
+
+              <div className="settings-row settings-row-bordered mt-sm">
+                <div className="settings-row-info">
+                  <h4>Injection Method</h4>
+                  <p>How snippets are typed out.</p>
+                </div>
+                <select
+                  className="form-input"
+                  style={{ width: "200px" }}
+                  value={localSettings.injection_method}
+                  onChange={(e) => updateSetting("injection_method", e.target.value)}
+                >
+                  <option value="auto">Auto (Recommended)</option>
+                  <option value="keystrokes">Keystrokes</option>
+                  <option value="clipboard">Clipboard</option>
+                </select>
+              </div>
+
+              <div className="settings-row" style={{ borderTop: "1px solid var(--border-color)" }}>
+                <div className="settings-row-info">
+                  <h4>Search Hotkey</h4>
+                  <p>Global shortcut to open search.</p>
+                </div>
+                <input
+                  type="text"
+                  className="form-input"
+                  style={{ width: "200px" }}
+                  value={localSettings.search_hotkey}
+                  onChange={(e) => updateSetting("search_hotkey", e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Data Management Card */}
+            <div id="section-data" className="settings-card">
+              <div className="settings-card-header">
+                <span className="material-symbols-outlined icon-primary">storage</span>
+                <h3 className="settings-card-title">Data Management</h3>
+              </div>
+              <p className="settings-card-desc">
+                Manage your snippet database, sync with the cloud, or create local backups.
+              </p>
+
+              <div className="action-cards-grid">
+                <div className="action-card">
+                  <div className="action-card-header">
+                    <span className="material-symbols-outlined">cloud_sync</span>
+                    <h4>Cloud Sync</h4>
+                  </div>
+                  <p>Last synced: Today at 10:42 AM.</p>
+                  <Button variant="secondary" className="action-btn-full" onClick={() => {}}>
+                    Sync Now
+                  </Button>
+                </div>
+                
+                <div className="action-card">
+                  <div className="action-card-header">
+                    <span className="material-symbols-outlined">download</span>
+                    <h4>Export Data</h4>
+                  </div>
+                  <p>Download all snippets as a JSON file.</p>
+                  <Button variant="secondary" className="action-btn-outline" onClick={() => {}}>
+                    Export to JSON
+                  </Button>
+                </div>
+              </div>
+
+              <div className="settings-row settings-row-bordered pt-md">
+                <div className="settings-row-info">
+                  <h4>Restore Backup</h4>
+                  <p>Overwrite current data from a backup file.</p>
+                </div>
+                <Button variant="secondary" className="action-btn-danger" onClick={() => {}}>
+                  Restore...
+                </Button>
+              </div>
+            </div>
+
+            {/* Appearance Card */}
+            <div id="section-appearance" className="settings-card">
+              <div className="settings-card-header">
+                <span className="material-symbols-outlined icon-primary">palette</span>
+                <h3 className="settings-card-title">Appearance</h3>
+              </div>
+
+              <div className="settings-row">
+                <div className="settings-row-info">
+                  <h4>Theme</h4>
+                  <p>Choose your preferred color theme.</p>
+                </div>
+                <select
+                  className="form-input"
+                  style={{ width: "200px" }}
+                  value={localSettings.theme}
+                  onChange={(e) => updateSetting("theme", e.target.value)}
+                >
+                  <option value="dark">Dark</option>
+                  <option value="light">Light</option>
+                  <option value="system">System</option>
+                </select>
+              </div>
+            </div>
+            
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+</file>
+
+<file path="src/components/views/SnippetsView.tsx">
+import { SnippetsViewProps } from "../../types";
+import { Button } from "../ui/Button";
+import { IconButton } from "../ui/IconButton";
+
+export function SnippetsView({ snippets, onEdit }: SnippetsViewProps) {
+  
+  const getCategoryClass = (category?: string | null) => {
+    switch (category?.toLowerCase()) {
+      case 'communication': return 'category-communication';
+      case 'development': return 'category-development';
+      default: return 'category-general';
+    }
+  };
+
+  const formatTimeAgo = (timestamp?: number | null) => {
+    if (!timestamp) return 'Never';
+    const seconds = Math.floor(Date.now() / 1000) - timestamp;
+    if (seconds < 60) return 'Just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    return `${Math.floor(seconds / 86400)}d ago`;
+  };
+
+  return (
+    <>
+      <div className="content-area content-area-padded">
+        <div className="view-header">
+          <div>
+            <h2 className="header-title">All Snippets</h2>
+            <p className="view-description">
+              Manage and organize your reusable text blocks.
+            </p>
+          </div>
+          <div className="view-actions">
+            <Button variant="secondary" icon={<span className="material-symbols-outlined icon-sm">filter_list</span>}>
+              Filter
+            </Button>
+            <Button variant="secondary" icon={<span className="material-symbols-outlined icon-sm">sort</span>}>
+              Sort
+            </Button>
+          </div>
+        </div>
+
+        {/* Snippets Grid */}
+        {snippets.length > 0 ? (
+          <div className="snippet-grid snippet-grid-mt">
+            {snippets.map((snippet) => (
+              <div
+                key={snippet.id}
+                className="snippet-card"
+                onClick={() => onEdit(snippet)}
+              >
+                <div className="card-indicator"></div>
+                
+                <div className="snippet-card-header">
+                  <h3 className="snippet-card-title">
+                    {snippet.label || snippet.id}
+                  </h3>
+                  <div className="snippet-card-actions">
+                    <IconButton
+                      icon={<span className="material-symbols-outlined icon-sm">star</span>}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Favorite toggle logic can be added here
+                      }}
+                    />
+                    <IconButton
+                      icon={<span className="material-symbols-outlined icon-sm">content_copy</span>}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(snippet.replace);
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="snippet-card-tags">
+                  <span className={`tag-chip ${getCategoryClass(snippet.category)}`}>
+                    {snippet.category || "General"}
+                  </span>
+                  <span className="trigger-chip">
+                    {snippet.trigger || snippet.regex || "No trigger"}
+                  </span>
+                </div>
+
+                <div className="snippet-content-box">
+                  {snippet.replace}
+                  <div className="snippet-content-fade"></div>
+                </div>
+
+                <div className="snippet-footer">
+                  <span>Used {snippet.usage_count || 0} times</span>
+                  <span>Updated {formatTimeAgo(snippet.updated_at)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state">
+            <div className="empty-state-icon">
+              <span className="material-symbols-outlined icon-lg">dataset</span>
+            </div>
+            <h3 className="empty-state-title">No snippets yet</h3>
+            <p className="empty-state-text">
+              Create your first snippet to start expanding text automatically
+            </p>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+</file>
+
+<file path="src/styles/base.css">
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-primary);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* App Container */
+.app {
+  display: flex;
+  height: 100vh;
+  background: var(--bg-primary);
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Layout Utilities */
+.content-area-padded {
+  padding-top: var(--space-lg);
+}
+
+.view-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-lg);
+}
+
+.view-description {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.view-actions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+/* Icon Utilities */
+.icon-sm {
+  font-size: 18px !important;
+}
+
+.icon-md {
+  font-size: 20px !important;
+}
+
+.icon-lg {
+  font-size: 32px !important;
+}
+
+.icon-primary {
+  color: var(--primary-color);
+}
+</file>
+
+<file path="src/styles/EmptyState.css">
+/* Empty State */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xl);
+  text-align: center;
+  margin-top: var(--space-xl);
+}
+
+.empty-state-icon {
+  width: 64px;
+  height: 64px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-md);
+  color: var(--text-muted);
+}
+.empty-state-icon svg {
+  width: 32px;
+  height: 32px;
+}
+
+.empty-state-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: var(--space-xs);
+}
+
+.empty-state-text {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-lg);
+}
+</file>
+
+<file path="src/styles/forms.css">
+/* Form Elements */
+.form-group {
+  margin-bottom: var(--space-md);
+}
+
+.form-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.form-input {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  transition: all var(--transition-fast);
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--border-active);
+  box-shadow: 0 0 0 1px var(--border-active);
+}
+
+.form-textarea {
+  min-height: 100px;
+  resize: vertical;
+  font-family: var(--font-mono);
+}
+
+.form-group-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+
+.mb-0 {
+  margin-bottom: 0 !important;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+.form-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: var(--space-xs);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-md);
+  margin-top: var(--space-xl);
+}
+</file>
+
+<file path="src/styles/SettingsView.css">
+/* Settings Layout */
+.settings-layout {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: var(--space-xl);
+  max-width: 1000px;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Settings Nav */
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  background: transparent;
+  text-align: left;
+}
+
+.settings-nav-item:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.settings-nav-item.active {
+  background: var(--primary-color-alpha);
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+/* Settings Card (Glass Panel) */
+.settings-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  box-shadow: var(--shadow-level-1);
+  margin-bottom: var(--space-xl);
+}
+
+.settings-card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: var(--space-lg);
+}
+
+.settings-card-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+/* Settings Row */
+.settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-sm) 0;
+}
+
+.settings-row-info h4 {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.settings-row-info p {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin: 4px 0 0 0;
+}
+
+/* Action Cards (for Data Management) */
+.action-cards-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.action-card {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  transition: box-shadow 0.2s;
+}
+
+.action-card:hover {
+  box-shadow: var(--shadow-level-1);
+}
+
+.action-card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--primary-color);
+  margin-bottom: var(--space-sm);
+}
+
+.action-card-header h4 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.action-card p {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-md) 0;
+  flex: 1;
+}
+
+/* Range Slider */
+.slider-container {
+  padding: var(--space-sm) 0;
+}
+
+.settings-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding-bottom: 100px;
+}
+
+.settings-row-bordered {
+  border-top: 1px solid var(--border-color);
+}
+
+.mt-sm {
+  margin-top: var(--space-sm);
+}
+
+.pt-md {
+  padding-top: var(--space-md);
+}
+
+.slider-container {
+  border-top: 1px solid var(--border-color);
+  padding-top: var(--space-md);
+  margin-top: var(--space-sm);
+  padding-bottom: var(--space-sm);
+}
+
+.slider-header h4 {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.settings-input-fixed {
+  width: 200px;
+}
+
+.settings-card-desc {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-lg);
+}
+
+.action-btn-full {
+  width: 100%;
+  justify-content: center;
+}
+
+.action-btn-outline {
+  width: 100%;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border-color);
+}
+
+.action-btn-danger {
+  color: var(--error-color);
+  border-color: transparent;
+  background: transparent;
+}
+
+.slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-sm);
+}
+
+.slider-value {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--primary-color);
+}
+
+.slider-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  padding: 0 4px;
+}
+
+.slider-labels span {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+}
+
+input[type="range"].range-slider {
+  width: 100%;
+  height: 6px;
+  background: var(--border-color);
+  border-radius: 4px;
+  appearance: none;
+  outline: none;
+  padding: 0;
+  margin: 8px 0;
+}
+
+input[type="range"].range-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+input[type="range"].range-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+</file>
+
+<file path="src/styles/Sidebar.css">
+/* Sidebar */
+.sidebar {
+  width: var(--sidebar-width);
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-md);
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: 40px;
+}
+
+.sidebar-logo {
+  width: 32px;
+  height: 32px;
+  background: var(--primary-color);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--on-primary);
+}
+
+.sidebar-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sidebar-nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  color: var(--text-secondary);
+  font-weight: 400;
+  position: relative;
+}
+
+.nav-item:hover {
+  background: rgba(0, 0, 0, 0.03);
+  color: var(--text-primary);
+}
+[data-theme="dark"] .nav-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.nav-item.active {
+  background: rgba(0, 103, 192, 0.1);
+  color: var(--text-primary);
+}
+[data-theme="dark"] .nav-item.active {
+  background: rgba(166, 200, 255, 0.15);
+}
+
+/* Active indicator pill */
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 16px;
+  background: var(--primary-color);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.nav-item svg {
+  width: 18px;
+  height: 18px;
+}
+
+.sidebar-new-btn-wrapper { margin-bottom: var(--space-lg); }
+.sidebar-new-btn { width: 100%; justify-content: center; background: linear-gradient(135deg, #0078D4, #0067C0); border: none; }
+.sidebar-icon { font-size: 20px; }
+.sidebar-divider { height: 1px; background: var(--border-color); margin: var(--space-sm) var(--space-md); }
+.sidebar-bottom { margin-top: auto; }
+.sidebar-icon-small { font-size: 18px; }
+.sidebar-text-small { font-size: 0.875rem; }
+</file>
+
+<file path="src/styles/SnippetEditor.css">
+/* Snippet Editor specific styles (Modal styles removed as it is now a main view) */
+</file>
+
+<file path="src/styles/SnippetsView.css">
+/* Content Area */
+.content-area {
+  flex: 1;
+  padding: 0 var(--space-lg) var(--space-lg);
+  overflow-y: auto;
+}
+
+/* Snippet Grid */
+.snippet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-md);
+}
+
+/* Snippet Card - Level 2 Depth */
+.snippet-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-level-2);
+}
+
+.snippet-card:hover {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: #d1d1d1;
+}
+[data-theme="dark"] .snippet-card:hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: #555555;
+}
+
+.snippet-trigger {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--primary-color);
+  margin-bottom: var(--space-xs);
+}
+
+.snippet-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-sm);
+}
+
+.snippet-preview {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Dashboard Cards */
+.card-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: var(--border-color);
+  transition: background var(--transition-fast);
+}
+
+.snippet-card:hover .card-indicator {
+  background: var(--primary-color);
+}
+
+.category-communication { --cat-color: rgb(0, 103, 192); --cat-bg: rgb(229, 240, 249); }
+.category-development { --cat-color: rgb(0, 103, 192); --cat-bg: rgb(229, 240, 249); }
+.category-general { --cat-color: rgb(0, 103, 192); --cat-bg: rgb(229, 240, 249); }
+
+[data-theme="dark"] .category-communication { --cat-color: rgb(0, 103, 192); --cat-bg: rgba(103, 149, 201, 0.2); }
+[data-theme="dark"] .category-development { --cat-color: rgb(0, 103, 192); --cat-bg: rgba(103, 149, 201, 0.2); }
+[data-theme="dark"] .category-general { --cat-color: rgb(0, 103, 192); --cat-bg: rgba(103, 149, 201, 0.2); }
+
+.tag-chip {
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--cat-color);
+  background: var(--cat-bg);
+  border: 1px solid rgba(0,0,0,0.05);
+}
+[data-theme="dark"] .tag-chip {
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.trigger-chip {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.snippet-content-box {
+  flex: 1;
+  background: var(--bg-secondary);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  position: relative;
+  margin-top: var(--space-sm);
+  margin-bottom: var(--space-md);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.snippet-content-fade {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 24px;
+  background: linear-gradient(to top, var(--bg-secondary), transparent);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+.snippet-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.snippet-grid-mt {
+  margin-top: var(--space-md);
+}
+
+.snippet-card {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.snippet-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.snippet-card-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  padding-right: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.snippet-card-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.snippet-card-tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+</file>
+
+<file path="src/styles/Toggle.css">
+/* Toggle Switch */
+.toggle {
+  position: relative;
+  width: 40px;
+  height: 20px;
+  background: var(--border-color);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  display: flex;
+  align-items: center;
+}
+
+.toggle.active {
+  background: var(--primary-color);
+}
+
+.toggle-knob {
+  position: absolute;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: var(--bg-primary);
+  border-radius: 50%;
+  transition: transform var(--transition-fast);
+  box-shadow: var(--shadow-level-2);
+}
+
+.toggle.active .toggle-knob {
+  transform: translateX(20px);
+}
+</file>
+
+<file path="src/styles/TopBar.css">
+/* Header - Top App Bar */
+.top-app-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-lg);
+  height: 64px;
+  background: var(--mica-bg);
+  backdrop-filter: var(--backdrop-blur);
+  -webkit-backdrop-filter: var(--backdrop-blur);
+  border-bottom: 1px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.top-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.header-title {
+  font-family: var(--font-heading);
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+@media (min-width: 768px) {
+  .header-title {
+    font-size: 2.5rem;
+  }
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+/* Search Input */
+.search-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+}
+
+.search-input {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md) var(--space-sm) 36px;
+  background: var(--bg-secondary);
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  transition: all var(--transition-fast);
+}
+
+.search-input:focus {
+  outline: none;
+  background: var(--bg-primary);
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 1px var(--primary-color);
+}
+
+.search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.search-icon {
+  position: absolute;
+  left: var(--space-md);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.search-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.search-icon-symbol {
+  font-size: 20px;
+}
+
+.engine-toggle-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: var(--space-sm);
+  padding: 4px 12px;
+  background-color: var(--bg-secondary);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-color);
+}
+
+.engine-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.engine-toggle-icon {
+  font-size: 18px;
+  color: var(--text-secondary);
+}
+
+.engine-toggle-text {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+</file>
+
+<file path="src/styles/ui.css">
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: 6px 16px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  padding: 8px;
+}
+
+.btn-primary {
+  background: var(--primary-color);
+  color: var(--on-primary);
+}
+
+.btn-primary:hover {
+  background: var(--primary-hover);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+  background: rgba(0,0,0,0.03);
+}
+[data-theme="dark"] .btn-secondary:hover {
+  background: rgba(255,255,255,0.05);
+}
+
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon:hover {
+  background: rgba(0,0,0,0.05);
+  color: var(--text-primary);
+}
+[data-theme="dark"] .btn-icon:hover {
+  background: rgba(255,255,255,0.1);
+}
+.btn-icon svg {
+  width: 16px;
+  height: 16px;
+}
+</file>
+
+<file path="src/styles/variables.css">
+:root {
+  /* Fluent Velocity Design System - Modular Values */
+
+  /* Colors - Light Theme (Default Windows 11 Vibe) */
+  --primary-color: #0067c0; /* Action Blue */
+  --primary-hover: #005eb1;
+  --on-primary: #ffffff;
+  
+  --bg-primary: #ffffff; /* Primary background */
+  --bg-secondary: #f3f3f3; /* Sidebar, search container */
+  --bg-tertiary: #f9f9f9; /* Mica substitute base */
+  
+  --text-primary: #1c1c1c;
+  --text-secondary: #616161;
+  --text-muted: #808080;
+  
+  --border-color: #e5e5e5;
+  --border-active: var(--primary-color);
+  
+  /* Glassmorphism / Mica */
+  --mica-bg: rgba(249, 249, 249, 0.7);
+  --backdrop-blur: blur(20px);
+  
+  /* Status Colors */
+  --success-bg: #e6f4ea;
+  --success-text: #137333;
+  --error-bg: #fce8e6;
+  --error-text: #c5221f;
+
+  /* Spacing Rhythm (4px/8px) */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --sidebar-width: 260px;
+  
+  /* Shapes */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+  
+  /* Typography */
+  --font-primary: 'Inter', sans-serif;
+  --font-heading: 'Hanken Grotesk', sans-serif;
+  --font-mono: 'Geist', monospace;
+  
+  /* Elevations / Depth */
+  --shadow-level-2: 0px 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-level-3: 0px 8px 16px rgba(0, 0, 0, 0.08);
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+}
+
+/* Dark Theme overrides */
+[data-theme="dark"] {
+  --primary-color: #a6c8ff;
+  --primary-hover: #dbe7ff;
+  --on-primary: #001c3b;
+
+  --bg-primary: #1b1b1b;
+  --bg-secondary: #2b2b2b;
+  --bg-tertiary: #333333;
+
+  --text-primary: #ffffff;
+  --text-secondary: #b3b3b3;
+  --text-muted: #808080;
+
+  --border-color: #404040;
+  --border-active: var(--primary-color);
+
+  --mica-bg: rgba(43, 43, 43, 0.7);
+  --shadow-level-2: 0px 2px 4px rgba(0, 0, 0, 0.2);
+  --shadow-level-3: 0px 8px 16px rgba(0, 0, 0, 0.3);
+}
+</file>
+
+<file path="src/types.ts">
+export interface Snippet {
+  id: string;
+  trigger: string | null;
+  regex: string | null;
+  replace: string;
+  label: string | null;
+  word: boolean;
+  uppercase_style: string | null;
+  image_path: string | null;
+  shell: string | null;
+  form_fields: FormField[] | null;
+  filter_app: string | null;
+  category?: string | null;
+  usage_count?: number | null;
+  updated_at?: number | null;
+}
+
+export interface FormField {
+  name: string;
+  label: string | null;
+  default: string;
+  field_type: string;
+  choices: string[] | null;
+}
+
+export interface AppSettings {
+  enabled: boolean;
+  injection_method: string;
+  search_hotkey: string;
+  undo_backspace_ms: number;
+  start_with_windows: boolean;
+  show_in_tray: boolean;
+  theme: string;
+  toggle_hotkey: string | null;
+}
+
+export interface EngineStatus {
+  enabled: boolean;
+  hook_installed: boolean;
+}
+
+export interface SnippetsViewProps {
+  snippets: Snippet[];
+  onEdit: (snippet: Snippet) => void;
+  onDelete: (id: string) => void;
+}
+
+export interface SnippetEditorProps {
+  snippet: Snippet | null;
+  onSave: (snippet: Snippet) => void;
+  onClose: () => void;
+}
+
+export interface SettingsViewProps {
+  settings: AppSettings | null;
+  onSave: () => void;
+}
+
+export interface SidebarProps {
+  activeTab: "snippets" | "settings" | "editor";
+  setActiveTab: (tab: "snippets" | "settings" | "editor") => void;
+  onNewSnippet: () => void;
+}
+</file>
 
 <file path=".github/workflows/release.yaml">
 name: Release
@@ -223,26 +1937,6 @@ dist-ssr
 - initial commit
 
 All notable changes to this project will be documented in this file.
-</file>
-
-<file path="index.html">
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Geist:wght@400;500&display=swap" rel="stylesheet">
-    <title>SwiftType</title>
-  </head>
-
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
 </file>
 
 <file path="README.md">
@@ -512,1240 +2206,6 @@ fn main() {
 }
 </file>
 
-<file path="src/App.css">
-:root {
-  /* Fluent Velocity Design System - Modular Values */
-
-  /* Colors - Light Theme (Default Windows 11 Vibe) */
-  --primary-color: #0067c0; /* Action Blue */
-  --primary-hover: #005eb1;
-  --on-primary: #ffffff;
-  
-  --bg-primary: #ffffff; /* Primary background */
-  --bg-secondary: #f3f3f3; /* Sidebar, search container */
-  --bg-tertiary: #f9f9f9; /* Mica substitute base */
-  
-  --text-primary: #1c1c1c;
-  --text-secondary: #616161;
-  --text-muted: #808080;
-  
-  --border-color: #e5e5e5;
-  --border-active: var(--primary-color);
-  
-  /* Glassmorphism / Mica */
-  --mica-bg: rgba(249, 249, 249, 0.7);
-  --backdrop-blur: blur(20px);
-  
-  /* Status Colors */
-  --success-bg: #e6f4ea;
-  --success-text: #137333;
-  --error-bg: #fce8e6;
-  --error-text: #c5221f;
-
-  /* Spacing Rhythm (4px/8px) */
-  --space-xs: 4px;
-  --space-sm: 8px;
-  --space-md: 16px;
-  --space-lg: 24px;
-  --space-xl: 32px;
-  --sidebar-width: 260px;
-  
-  /* Shapes */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-full: 9999px;
-  
-  /* Typography */
-  --font-primary: 'Inter', sans-serif;
-  --font-mono: 'Geist', monospace;
-  
-  /* Elevations / Depth */
-  --shadow-level-2: 0px 2px 4px rgba(0, 0, 0, 0.04);
-  --shadow-level-3: 0px 8px 16px rgba(0, 0, 0, 0.08);
-
-  /* Transitions */
-  --transition-fast: 150ms ease;
-  --transition-normal: 250ms ease;
-}
-
-/* Dark Theme overrides */
-[data-theme="dark"] {
-  --primary-color: #a6c8ff;
-  --primary-hover: #dbe7ff;
-  --on-primary: #001c3b;
-
-  --bg-primary: #1b1b1b;
-  --bg-secondary: #2b2b2b;
-  --bg-tertiary: #333333;
-
-  --text-primary: #ffffff;
-  --text-secondary: #b3b3b3;
-  --text-muted: #808080;
-
-  --border-color: #404040;
-  --border-active: var(--primary-color);
-
-  --mica-bg: rgba(43, 43, 43, 0.7);
-  --shadow-level-2: 0px 2px 4px rgba(0, 0, 0, 0.2);
-  --shadow-level-3: 0px 8px 16px rgba(0, 0, 0, 0.3);
-}
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-html, body, #root {
-  height: 100%;
-  width: 100%;
-  overflow: hidden;
-}
-
-body {
-  font-family: var(--font-primary);
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* App Container */
-.app {
-  display: flex;
-  height: 100vh;
-  background: var(--bg-primary);
-}
-
-/* Sidebar */
-.sidebar {
-  width: var(--sidebar-width);
-  background: var(--bg-secondary);
-  display: flex;
-  flex-direction: column;
-  padding: var(--space-md);
-  /* Level 1 Depth - subtle tonal shift */
-}
-
-.sidebar-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  padding: var(--space-md);
-  margin-bottom: var(--space-lg);
-}
-
-.sidebar-logo {
-  width: 32px;
-  height: 32px;
-  background: var(--primary-color);
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--on-primary);
-}
-
-.sidebar-title {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.sidebar-nav {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  padding: var(--space-sm) var(--space-md);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  color: var(--text-secondary);
-  font-weight: 400;
-  position: relative;
-}
-
-.nav-item:hover {
-  background: rgba(0, 0, 0, 0.03);
-  color: var(--text-primary);
-}
-[data-theme="dark"] .nav-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.nav-item.active {
-  background: rgba(0, 103, 192, 0.1);
-  color: var(--text-primary);
-}
-[data-theme="dark"] .nav-item.active {
-  background: rgba(166, 200, 255, 0.15);
-}
-
-/* Active indicator pill */
-.nav-item.active::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 16px;
-  background: var(--primary-color);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-}
-
-.nav-item svg {
-  width: 18px;
-  height: 18px;
-}
-
-/* Main Content */
-.main-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--bg-primary);
-}
-
-/* Header - Mica Effect */
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-lg) var(--space-lg);
-  background: var(--mica-bg);
-  backdrop-filter: var(--backdrop-blur);
-  -webkit-backdrop-filter: var(--backdrop-blur);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-.header-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-}
-
-/* Search Input */
-.search-wrapper {
-  position: relative;
-  width: 280px;
-}
-
-.search-input {
-  width: 100%;
-  padding: var(--space-sm) var(--space-md) var(--space-sm) 36px;
-  background: var(--bg-secondary);
-  border: 1px solid transparent;
-  border-radius: var(--radius-full);
-  color: var(--text-primary);
-  font-size: 0.875rem;
-  transition: all var(--transition-fast);
-}
-
-.search-input:focus {
-  outline: none;
-  background: var(--bg-primary);
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 1px var(--primary-color);
-}
-
-.search-input::placeholder {
-  color: var(--text-muted);
-}
-
-.search-icon {
-  position: absolute;
-  left: var(--space-md);
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--text-muted);
-  pointer-events: none;
-}
-.search-icon svg {
-  width: 16px;
-  height: 16px;
-}
-
-/* Content Area */
-.content-area {
-  flex: 1;
-  padding: 0 var(--space-lg) var(--space-lg);
-  overflow-y: auto;
-}
-
-/* Snippet Grid */
-.snippet-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: var(--space-md);
-}
-
-/* Snippet Card - Level 2 Depth */
-.snippet-card {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: var(--space-md);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  box-shadow: var(--shadow-level-2);
-}
-
-.snippet-card:hover {
-  background: rgba(0, 0, 0, 0.02);
-  border-color: #d1d1d1;
-}
-[data-theme="dark"] .snippet-card:hover {
-  background: rgba(255, 255, 255, 0.03);
-  border-color: #555555;
-}
-
-.snippet-trigger {
-  font-family: var(--font-mono);
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--primary-color);
-  margin-bottom: var(--space-xs);
-}
-
-.snippet-label {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: var(--space-sm);
-}
-
-.snippet-preview {
-  font-family: var(--font-mono);
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-  background: transparent;
-  padding: 0;
-  border-radius: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Buttons */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-sm);
-  padding: 6px 16px;
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.btn-primary {
-  background: var(--primary-color);
-  color: var(--on-primary);
-}
-
-.btn-primary:hover {
-  background: var(--primary-hover);
-}
-
-.btn-secondary {
-  background: transparent;
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-}
-
-.btn-secondary:hover {
-  background: rgba(0,0,0,0.03);
-}
-[data-theme="dark"] .btn-secondary:hover {
-  background: rgba(255,255,255,0.05);
-}
-
-.btn-icon {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--text-secondary);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.btn-icon:hover {
-  background: rgba(0,0,0,0.05);
-  color: var(--text-primary);
-}
-[data-theme="dark"] .btn-icon:hover {
-  background: rgba(255,255,255,0.1);
-}
-.btn-icon svg {
-  width: 16px;
-  height: 16px;
-}
-
-/* Form Elements */
-.form-group {
-  margin-bottom: var(--space-md);
-}
-
-.form-label {
-  display: block;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-primary);
-  margin-bottom: var(--space-xs);
-}
-
-.form-input {
-  width: 100%;
-  padding: var(--space-sm) var(--space-md);
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: 0.875rem;
-  transition: all var(--transition-fast);
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: var(--border-active);
-  box-shadow: 0 0 0 1px var(--border-active);
-}
-
-.form-textarea {
-  min-height: 100px;
-  resize: vertical;
-  font-family: var(--font-mono);
-}
-
-/* Toggle Switch */
-.toggle {
-  position: relative;
-  width: 40px;
-  height: 20px;
-  background: var(--border-color);
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  transition: background var(--transition-fast);
-  display: flex;
-  align-items: center;
-}
-
-.toggle.active {
-  background: var(--primary-color);
-}
-
-.toggle-knob {
-  position: absolute;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  background: var(--bg-primary);
-  border-radius: 50%;
-  transition: transform var(--transition-fast);
-  box-shadow: var(--shadow-level-2);
-}
-
-.toggle.active .toggle-knob {
-  transform: translateX(20px);
-}
-
-/* Modal - Level 3 Depth */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  animation: fadeIn 200ms ease;
-}
-
-.modal {
-  background: var(--mica-bg);
-  backdrop-filter: var(--backdrop-blur);
-  -webkit-backdrop-filter: var(--backdrop-blur);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  width: 90%;
-  max-width: 520px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: var(--shadow-level-3);
-  animation: slideUp 200ms ease;
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-md) var(--space-lg);
-  border-bottom: 1px solid var(--border-color);
-  background: var(--bg-primary);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-}
-
-.modal-title {
-  font-size: 1.125rem;
-  font-weight: 600;
-}
-
-.modal-body {
-  padding: var(--space-lg);
-  background: var(--bg-primary);
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-sm);
-  padding: var(--space-md) var(--space-lg);
-  background: var(--bg-secondary);
-  border-top: 1px solid var(--border-color);
-  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-}
-
-/* Animations */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-/* Stats Cards */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: var(--space-md);
-  margin-bottom: var(--space-lg);
-}
-
-.stat-card {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: var(--space-md);
-  box-shadow: var(--shadow-level-2);
-}
-
-.stat-value {
-  font-size: 1.75rem;
-  font-weight: 600;
-  color: var(--primary-color);
-}
-
-.stat-label {
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-  margin-top: 2px;
-}
-
-/* Empty State */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-xl);
-  text-align: center;
-  margin-top: var(--space-xl);
-}
-
-.empty-state-icon {
-  width: 64px;
-  height: 64px;
-  background: var(--bg-secondary);
-  border-radius: var(--radius-full);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: var(--space-md);
-  color: var(--text-muted);
-}
-.empty-state-icon svg {
-  width: 32px;
-  height: 32px;
-}
-
-.empty-state-title {
-  font-size: 1.125rem;
-  font-weight: 600;
-  margin-bottom: var(--space-xs);
-}
-
-.empty-state-text {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  margin-bottom: var(--space-lg);
-}
-
-/* Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
-}
-</file>
-
-<file path="src/App.tsx">
-import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
-import snippetsIcon from "./assets/icons/snippets.svg";
-import settingsIcon from "./assets/icons/settings.svg";
-import plusIcon from "./assets/icons/plus.svg";
-import searchIcon from "./assets/icons/search.svg";
-import xIcon from "./assets/icons/x.svg";
-import zapIcon from "./assets/icons/zap.svg";
-import powerIcon from "./assets/icons/power.svg";
-import trashIcon from "./assets/icons/trash.svg";
-import editIcon from "./assets/icons/edit.svg";
-
-// Types matching Rust structs
-interface Snippet {
-  id: string;
-  trigger: string | null;
-  regex: string | null;
-  replace: string;
-  label: string | null;
-  word: boolean;
-  uppercase_style: string | null;
-  image_path: string | null;
-  shell: string | null;
-  form_fields: FormField[] | null;
-  filter_app: string | null;
-}
-
-interface FormField {
-  name: string;
-  label: string | null;
-  default: string;
-  field_type: string;
-  choices: string[] | null;
-}
-
-interface AppSettings {
-  enabled: boolean;
-  injection_method: string;
-  search_hotkey: string;
-  undo_backspace_ms: number;
-  start_with_windows: boolean;
-  show_in_tray: boolean;
-  theme: string;
-  toggle_hotkey: string | null;
-}
-
-interface EngineStatus {
-  enabled: boolean;
-  hook_installed: boolean;
-}
-
-
-// Main App Component
-function App() {
-  const [activeTab, setActiveTab] = useState<"snippets" | "settings">("snippets");
-  const [snippets, setSnippets] = useState<Snippet[]>([]);
-  const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [engineStatus, setEngineStatus] = useState<EngineStatus | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showEditor, setShowEditor] = useState(false);
-  const [editingSnippet, setEditingSnippet] = useState<Snippet | null>(null);
-
-  // Load data on mount
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    try {
-      const [snips, sets, status] = await Promise.all([
-        invoke<Snippet[]>("get_snippets"),
-        invoke<AppSettings>("get_settings"),
-        invoke<EngineStatus>("get_engine_status"),
-      ]);
-      setSnippets(snips);
-      setSettings(sets);
-      setEngineStatus(status);
-    } catch (err) {
-      console.error("Failed to load data:", err);
-    }
-  };
-
-  // Apply theme when settings change
-  useEffect(() => {
-    if (settings?.theme) {
-      const root = document.documentElement;
-      if (settings.theme === "system") {
-        // Check system preference
-        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        root.setAttribute("data-theme", prefersDark ? "dark" : "light");
-      } else {
-        root.setAttribute("data-theme", settings.theme);
-      }
-    }
-  }, [settings?.theme]);
-
-  const handleSearch = async (query: string) => {
-    setSearchQuery(query);
-    if (query.trim()) {
-      try {
-        const results = await invoke<Snippet[]>("search_snippets", { query });
-        setSnippets(results);
-      } catch (err) {
-        console.error("Search failed:", err);
-      }
-    } else {
-      const snips = await invoke<Snippet[]>("get_snippets");
-      setSnippets(snips);
-    }
-  };
-
-  const handleToggleEngine = async () => {
-    if (!engineStatus) return;
-    try {
-      await invoke("toggle_engine", { enabled: !engineStatus.enabled });
-      const status = await invoke<EngineStatus>("get_engine_status");
-      setEngineStatus(status);
-    } catch (err) {
-      console.error("Failed to toggle engine:", err);
-    }
-  };
-
-  const handleSaveSnippet = async (snippet: Snippet) => {
-    try {
-      if (editingSnippet && editingSnippet.id) {
-        await invoke("update_snippet", { id: editingSnippet.id, snippet });
-      } else {
-        await invoke("add_snippet", { snippet });
-      }
-      await loadData();
-      setShowEditor(false);
-      setEditingSnippet(null);
-    } catch (err) {
-      console.error("Failed to save snippet:", err);
-    }
-  };
-
-  const handleDeleteSnippet = async (id: string) => {
-    try {
-      await invoke("delete_snippet", { id });
-      await loadData();
-    } catch (err) {
-      console.error("Failed to delete snippet:", err);
-    }
-  };
-
-  const handleEditSnippet = (snippet: Snippet) => {
-    setEditingSnippet(snippet);
-    setShowEditor(true);
-  };
-
-  const handleNewSnippet = () => {
-    setEditingSnippet(null);
-    setShowEditor(true);
-  };
-
-  return (
-    <div className="app">
-      {/* Sidebar */}
-      <aside className="sidebar">
-        <div className="sidebar-header">
-          <div className="sidebar-logo">⚡</div>
-          <h1 className="sidebar-title">SwiftType</h1>
-        </div>
-
-        <nav className="sidebar-nav">
-          <div
-            className={`nav-item ${activeTab === "snippets" ? "active" : ""}`}
-            onClick={() => setActiveTab("snippets")}
-          >
-            <img src={snippetsIcon} alt="Snippets" />
-            <span>Snippets</span>
-          </div>
-          <div
-            className={`nav-item ${activeTab === "settings" ? "active" : ""}`}
-            onClick={() => setActiveTab("settings")}
-          >
-            <img src={settingsIcon} alt="Settings" />
-            <span>Settings</span>
-          </div>
-        </nav>
-
-        {/* Engine Status */}
-        <div style={{ marginTop: "auto", padding: "var(--space-md)" }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "var(--space-md)",
-              background: "var(--bg-tertiary)",
-              borderRadius: "var(--radius-md)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
-              <img src={powerIcon} alt="Power" />
-              <span style={{ fontSize: "0.875rem" }}>Engine</span>
-            </div>
-            <div
-              className={`toggle ${engineStatus?.enabled ? "active" : ""}`}
-              onClick={handleToggleEngine}
-            >
-              <div className="toggle-knob" />
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main className="main-content">
-        {activeTab === "snippets" ? (
-          <SnippetsView
-            snippets={snippets}
-            searchQuery={searchQuery}
-            onSearch={handleSearch}
-            onNew={handleNewSnippet}
-            onEdit={handleEditSnippet}
-            onDelete={handleDeleteSnippet}
-          />
-        ) : (
-          <SettingsView settings={settings} onSave={loadData} />
-        )}
-      </main>
-
-      {/* Snippet Editor Modal */}
-      {showEditor && (
-        <SnippetEditor
-          snippet={editingSnippet}
-          onSave={handleSaveSnippet}
-          onClose={() => {
-            setShowEditor(false);
-            setEditingSnippet(null);
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-// Snippets View Component
-interface SnippetsViewProps {
-  snippets: Snippet[];
-  searchQuery: string;
-  onSearch: (query: string) => void;
-  onNew: () => void;
-  onEdit: (snippet: Snippet) => void;
-  onDelete: (id: string) => void;
-}
-
-function SnippetsView({ snippets, searchQuery, onSearch, onNew, onEdit, onDelete }: SnippetsViewProps) {
-  return (
-    <>
-      <header className="header">
-        <h2 className="header-title">Snippets</h2>
-        <div className="header-actions">
-          <div className="search-wrapper">
-            <span className="search-icon">
-              <img src={searchIcon} alt="Search" />
-            </span>
-            <input
-              type="text"
-              className="search-input"
-              placeholder="Search snippets..."
-              value={searchQuery}
-              onChange={(e) => onSearch(e.target.value)}
-            />
-          </div>
-          <button className="btn btn-primary" onClick={onNew}>
-            <img src={plusIcon} alt="Plus" />
-            New Snippet
-          </button>
-        </div>
-      </header>
-
-      <div className="content-area">
-        {/* Stats */}
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-value">{snippets.length}</div>
-            <div className="stat-label">Total Snippets</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value">
-              {snippets.filter((s) => s.regex).length}
-            </div>
-            <div className="stat-label">Regex Patterns</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value">
-              {snippets.filter((s) => s.form_fields).length}
-            </div>
-            <div className="stat-label">With Forms</div>
-          </div>
-        </div>
-
-        {/* Snippets Grid */}
-        {snippets.length > 0 ? (
-          <div className="snippet-grid">
-            {snippets.map((snippet) => (
-              <div
-                key={snippet.id}
-                className="snippet-card"
-                onClick={() => onEdit(snippet)}
-              >
-                <div className="snippet-trigger">
-                  {snippet.trigger || snippet.regex || "No trigger"}
-                </div>
-                {snippet.label && (
-                  <div className="snippet-label">{snippet.label}</div>
-                )}
-                <div className="snippet-preview">{snippet.replace}</div>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "flex-end",
-                    gap: "var(--space-sm)",
-                    marginTop: "var(--space-md)",
-                  }}
-                >
-                  <button
-                    className="btn-icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEdit(snippet);
-                    }}
-                  >
-                    <img src={editIcon} alt="Edit" />
-                  </button>
-                  <button
-                    className="btn-icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDelete(snippet.id);
-                    }}
-                  >
-                    <img src={trashIcon} alt="Trash" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="empty-state">
-            <div className="empty-state-icon">
-              <img src={snippetsIcon} alt="Snippets" />
-            </div>
-            <h3 className="empty-state-title">No snippets yet</h3>
-            <p className="empty-state-text">
-              Create your first snippet to start expanding text automatically
-            </p>
-            <button className="btn btn-primary" onClick={onNew}>
-              <img src={plusIcon} alt="Plus" />
-              Create Snippet
-            </button>
-          </div>
-        )}
-      </div>
-    </>
-  );
-}
-
-// Snippet Editor Modal
-interface SnippetEditorProps {
-  snippet: Snippet | null;
-  onSave: (snippet: Snippet) => void;
-  onClose: () => void;
-}
-
-function SnippetEditor({ snippet, onSave, onClose }: SnippetEditorProps) {
-  const [trigger, setTrigger] = useState(snippet?.trigger || "");
-  const [replace, setReplace] = useState(snippet?.replace || "");
-  const [label, setLabel] = useState(snippet?.label || "");
-  const [useRegex, setUseRegex] = useState(!!snippet?.regex);
-  const [regex, setRegex] = useState(snippet?.regex || "");
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const newSnippet: Snippet = {
-      id: snippet?.id || `snip_${Date.now()}`,
-      trigger: useRegex ? null : trigger,
-      regex: useRegex ? regex : null,
-      replace,
-      label: label || null,
-      word: snippet?.word || false,
-      uppercase_style: snippet?.uppercase_style || null,
-      image_path: snippet?.image_path || null,
-      shell: snippet?.shell || null,
-      form_fields: snippet?.form_fields || null,
-      filter_app: snippet?.filter_app || null,
-    };
-    onSave(newSnippet);
-  };
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3 className="modal-title">
-            {snippet ? "Edit Snippet" : "New Snippet"}
-          </h3>
-          <button className="btn-icon" onClick={onClose}>
-            <img src={xIcon} alt="Close" />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit}>
-          <div className="modal-body">
-            <div className="form-group">
-              <label className="form-label">Label (optional)</label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="e.g., Email Signature"
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-              />
-            </div>
-
-            <div className="form-group">
-              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-md)", marginBottom: "var(--space-sm)" }}>
-                <label className="form-label" style={{ margin: 0 }}>
-                  {useRegex ? "Regex Pattern" : "Trigger"}
-                </label>
-                <label style={{ display: "flex", alignItems: "center", gap: "var(--space-xs)", fontSize: "0.875rem", color: "var(--text-secondary)" }}>
-                  <input
-                    type="checkbox"
-                    checked={useRegex}
-                    onChange={(e) => setUseRegex(e.target.checked)}
-                  />
-                  Use Regex
-                </label>
-              </div>
-              <input
-                type="text"
-                className="form-input"
-                placeholder={useRegex ? "e.g., :sig(\\d+)" : "e.g., :hello"}
-                value={useRegex ? regex : trigger}
-                onChange={(e) =>
-                  useRegex ? setRegex(e.target.value) : setTrigger(e.target.value)
-                }
-                style={{ fontFamily: "var(--font-mono)" }}
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Replacement Text</label>
-              <textarea
-                className="form-input form-textarea"
-                placeholder="Enter the text to expand to..."
-                value={replace}
-                onChange={(e) => setReplace(e.target.value)}
-              />
-              <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "var(--space-xs)" }}>
-                Variables: {"{{date}}"}, {"{{time}}"}, {"{{clipboard}}"}, {"{{weekday}}"}
-              </p>
-            </div>
-          </div>
-          <div className="modal-footer">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>
-              Cancel
-            </button>
-            <button type="submit" className="btn btn-primary">
-              {snippet ? "Save Changes" : "Create Snippet"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-// Settings View Component
-interface SettingsViewProps {
-  settings: AppSettings | null;
-  onSave: () => void;
-}
-
-function SettingsView({ settings, onSave }: SettingsViewProps) {
-  const [localSettings, setLocalSettings] = useState<AppSettings | null>(settings);
-
-  useEffect(() => {
-    setLocalSettings(settings);
-  }, [settings]);
-
-  const handleSave = async () => {
-    if (!localSettings) return;
-    try {
-      await invoke("update_settings", { settings: localSettings });
-      onSave();
-    } catch (err) {
-      console.error("Failed to save settings:", err);
-    }
-  };
-
-  if (!localSettings) {
-    return <div className="content-area">Loading...</div>;
-  }
-
-  return (
-    <>
-      <header className="header">
-        <h2 className="header-title">Settings</h2>
-        <div className="header-actions">
-          <button className="btn btn-primary" onClick={handleSave}>
-            Save Settings
-          </button>
-        </div>
-      </header>
-
-      <div className="content-area">
-        <div style={{ maxWidth: 600 }}>
-          <div className="form-group">
-            <label className="form-label">Injection Method</label>
-            <select
-              className="form-input"
-              value={localSettings.injection_method}
-              onChange={(e) =>
-                setLocalSettings({ ...localSettings, injection_method: e.target.value })
-              }
-            >
-              <option value="auto">Auto (Recommended)</option>
-              <option value="keystrokes">Keystrokes</option>
-              <option value="clipboard">Clipboard</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Search Hotkey</label>
-            <input
-              type="text"
-              className="form-input"
-              value={localSettings.search_hotkey}
-              onChange={(e) =>
-                setLocalSettings({ ...localSettings, search_hotkey: e.target.value })
-              }
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Theme</label>
-            <select
-              className="form-input"
-              value={localSettings.theme}
-              onChange={(e) =>
-                setLocalSettings({ ...localSettings, theme: e.target.value })
-              }
-            >
-              <option value="dark">Dark</option>
-              <option value="light">Light</option>
-              <option value="system">System</option>
-            </select>
-          </div>
-
-          <div
-            className="form-group"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <label className="form-label" style={{ marginBottom: 0 }}>
-              Start with Windows
-            </label>
-            <div
-              className={`toggle ${localSettings.start_with_windows ? "active" : ""}`}
-              onClick={() =>
-                setLocalSettings({
-                  ...localSettings,
-                  start_with_windows: !localSettings.start_with_windows,
-                })
-              }
-            >
-              <div className="toggle-knob" />
-            </div>
-          </div>
-
-          <div
-            className="form-group"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <label className="form-label" style={{ marginBottom: 0 }}>
-              Show in System Tray
-            </label>
-            <div
-              className={`toggle ${localSettings.show_in_tray ? "active" : ""}`}
-              onClick={() =>
-                setLocalSettings({
-                  ...localSettings,
-                  show_in_tray: !localSettings.show_in_tray,
-                })
-              }
-            >
-              <div className="toggle-knob" />
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-
-export default App;
-</file>
-
 <file path="src/main.tsx">
 import React from "react";
 import ReactDOM from "react-dom/client";
@@ -1836,6 +2296,27 @@ export default defineConfig(async () => ({
     },
   },
 }));
+</file>
+
+<file path="index.html">
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&family=Inter:wght@400;500;600&family=Geist:wght@400;500&display=swap" rel="stylesheet">
+    <title>SwiftType</title>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
 </file>
 
 <file path="src-tauri/Cargo.toml">
@@ -1939,6 +2420,18 @@ pub struct Snippet {
     /// App-specific filter
     #[serde(default)]
     pub filter_app: Option<String>,
+    
+    /// Category for organization
+    #[serde(default)]
+    pub category: Option<String>,
+    
+    /// Usage count for tracking popularity
+    #[serde(default)]
+    pub usage_count: Option<u32>,
+    
+    /// Last updated timestamp
+    #[serde(default)]
+    pub updated_at: Option<u64>,
 }
 
 /// Form field definition for dynamic snippets
@@ -2191,6 +2684,9 @@ fn create_default_config() -> Config {
                 shell: None,
                 form_fields: None,
                 filter_app: None,
+                category: Some("General".to_string()),
+                usage_count: Some(42),
+                updated_at: Some(1715424000), // Arbitrary past timestamp
             },
             Snippet {
                 id: "example_date".to_string(),
@@ -2204,6 +2700,9 @@ fn create_default_config() -> Config {
                 shell: None,
                 form_fields: None,
                 filter_app: None,
+                category: Some("Development".to_string()),
+                usage_count: Some(15),
+                updated_at: Some(1715424000),
             },
             Snippet {
                 id: "example_email".to_string(),
@@ -2217,6 +2716,9 @@ fn create_default_config() -> Config {
                 shell: None,
                 form_fields: None,
                 filter_app: None,
+                category: Some("Communication".to_string()),
+                usage_count: Some(89),
+                updated_at: Some(1715424000),
             },
         ],
         global_vars: HashMap::new(),
@@ -2272,6 +2774,208 @@ fn create_default_config() -> Config {
     ]
   }
 }
+</file>
+
+<file path="src/App.css">
+@import './styles/variables.css';
+@import './styles/base.css';
+@import './styles/Sidebar.css';
+@import './styles/TopBar.css';
+@import './styles/SnippetsView.css';
+@import './styles/ui.css';
+@import './styles/forms.css';
+@import './styles/Toggle.css';
+@import './styles/SnippetEditor.css';
+@import './styles/SettingsView.css';
+@import './styles/EmptyState.css';
+</file>
+
+<file path="src/App.tsx">
+import { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import "./App.css";
+
+import type { Snippet, AppSettings, EngineStatus } from "./types";
+
+import { Sidebar } from "./components/layout/Sidebar";
+import { SnippetsView } from "./components/views/SnippetsView";
+import { SettingsView } from "./components/views/SettingsView";
+import { SnippetEditor } from "./components/modals/SnippetEditor";
+import { Toggle } from "./components/ui/Toggle";
+
+// Main App Component
+function App() {
+  const [activeTab, setActiveTab] = useState<"snippets" | "settings" | "editor">("snippets");
+  const [snippets, setSnippets] = useState<Snippet[]>([]);
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [engineStatus, setEngineStatus] = useState<EngineStatus | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [editingSnippet, setEditingSnippet] = useState<Snippet | null>(null);
+
+  // Load data on mount
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const [snips, sets, status] = await Promise.all([
+        invoke<Snippet[]>("get_snippets"),
+        invoke<AppSettings>("get_settings"),
+        invoke<EngineStatus>("get_engine_status"),
+      ]);
+      setSnippets(snips);
+      setSettings(sets);
+      setEngineStatus(status);
+    } catch (err) {
+      console.error("Failed to load data:", err);
+    }
+  };
+
+  // Apply theme when settings change
+  useEffect(() => {
+    if (settings?.theme) {
+      const root = document.documentElement;
+      if (settings.theme === "system") {
+        // Check system preference
+        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        root.setAttribute("data-theme", prefersDark ? "dark" : "light");
+      } else {
+        root.setAttribute("data-theme", settings.theme);
+      }
+    }
+  }, [settings?.theme]);
+
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query);
+    if (query.trim()) {
+      try {
+        const results = await invoke<Snippet[]>("search_snippets", { query });
+        setSnippets(results);
+      } catch (err) {
+        console.error("Search failed:", err);
+      }
+    } else {
+      const snips = await invoke<Snippet[]>("get_snippets");
+      setSnippets(snips);
+    }
+  };
+
+  const handleToggleEngine = async () => {
+    if (!engineStatus) return;
+    try {
+      await invoke("toggle_engine", { enabled: !engineStatus.enabled });
+      const status = await invoke<EngineStatus>("get_engine_status");
+      setEngineStatus(status);
+    } catch (err) {
+      console.error("Failed to toggle engine:", err);
+    }
+  };
+
+  const handleSaveSnippet = async (snippet: Snippet) => {
+    try {
+      if (editingSnippet && editingSnippet.id) {
+        await invoke("update_snippet", { id: editingSnippet.id, snippet });
+      } else {
+        await invoke("add_snippet", { snippet });
+      }
+      await loadData();
+      setActiveTab("snippets");
+      setEditingSnippet(null);
+    } catch (err) {
+      console.error("Failed to save snippet:", err);
+    }
+  };
+
+  const handleDeleteSnippet = async (id: string) => {
+    try {
+      await invoke("delete_snippet", { id });
+      await loadData();
+    } catch (err) {
+      console.error("Failed to delete snippet:", err);
+    }
+  };
+
+  const handleEditSnippet = (snippet: Snippet) => {
+    setEditingSnippet(snippet);
+    setActiveTab("editor");
+  };
+
+  const handleNewSnippet = () => {
+    setEditingSnippet(null);
+    setActiveTab("editor");
+  };
+
+  return (
+    <div className="app">
+      {/* Sidebar */}
+      <Sidebar 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        onNewSnippet={handleNewSnippet}
+      />
+
+      {/* Main Content */}
+      <main className="main-content">
+        {/* Top App Bar */}
+        <header className="top-app-bar">
+          <div className="search-wrapper">
+            <span className="search-icon">
+              <span className="material-symbols-outlined search-icon-symbol">search</span>
+            </span>
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Search snippets, tags, or content..."
+              value={searchQuery}
+              onChange={(e) => handleSearch(e.target.value)}
+            />
+          </div>
+          <div className="top-bar-actions">
+            <div className="engine-toggle-wrapper">
+              <div className="engine-toggle-label">
+                <span className="material-symbols-outlined engine-toggle-icon">power_settings_new</span>
+                <span className="engine-toggle-text">Engine</span>
+              </div>
+              <Toggle active={engineStatus?.enabled || false} onClick={handleToggleEngine} />
+            </div>
+            <button className="btn-icon" onClick={loadData} title="Sync/Refresh">
+              <span className="material-symbols-outlined">sync</span>
+            </button>
+            <button className="btn-icon" onClick={() => setActiveTab("settings")} title="Settings">
+              <span className="material-symbols-outlined">settings</span>
+            </button>
+          </div>
+        </header>
+
+        {activeTab === "snippets" && (
+          <SnippetsView
+            snippets={snippets}
+            onEdit={handleEditSnippet}
+            onDelete={handleDeleteSnippet}
+          />
+        )}
+        
+        {activeTab === "settings" && (
+          <SettingsView settings={settings} onSave={loadData} />
+        )}
+        
+        {activeTab === "editor" && (
+          <SnippetEditor
+            snippet={editingSnippet}
+            onSave={handleSaveSnippet}
+            onClose={() => {
+              setActiveTab("snippets");
+              setEditingSnippet(null);
+            }}
+          />
+        )}
+      </main>
+    </div>
+  );
+}
+
+export default App;
 </file>
 
 <file path="src-tauri/src/text_injector.rs">

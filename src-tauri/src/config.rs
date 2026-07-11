@@ -51,6 +51,18 @@ pub struct Snippet {
     /// App-specific filter
     #[serde(default)]
     pub filter_app: Option<String>,
+    
+    /// Category for organization
+    #[serde(default)]
+    pub category: Option<String>,
+    
+    /// Usage count for tracking popularity
+    #[serde(default)]
+    pub usage_count: Option<u32>,
+    
+    /// Last updated timestamp
+    #[serde(default)]
+    pub updated_at: Option<u64>,
 }
 
 /// Form field definition for dynamic snippets
@@ -303,6 +315,9 @@ fn create_default_config() -> Config {
                 shell: None,
                 form_fields: None,
                 filter_app: None,
+                category: Some("General".to_string()),
+                usage_count: Some(42),
+                updated_at: Some(1715424000), // Arbitrary past timestamp
             },
             Snippet {
                 id: "example_date".to_string(),
@@ -316,6 +331,9 @@ fn create_default_config() -> Config {
                 shell: None,
                 form_fields: None,
                 filter_app: None,
+                category: Some("Development".to_string()),
+                usage_count: Some(15),
+                updated_at: Some(1715424000),
             },
             Snippet {
                 id: "example_email".to_string(),
@@ -329,6 +347,9 @@ fn create_default_config() -> Config {
                 shell: None,
                 form_fields: None,
                 filter_app: None,
+                category: Some("Communication".to_string()),
+                usage_count: Some(89),
+                updated_at: Some(1715424000),
             },
         ],
         global_vars: HashMap::new(),
