@@ -45,6 +45,16 @@ export function Sidebar({ activeTab, setActiveTab, snippets, onNewSnippet }: Sid
           <span>Favorites</span>
         </div>
         
+        <div 
+          className={`nav-item ${activeTab === "trash" ? "active" : ""}`}
+          onClick={() => setActiveTab("trash")}
+        >
+          <span className="material-symbols-outlined sidebar-icon">delete</span>
+          <span>Trash</span>
+        </div>
+
+        <div className="sidebar-divider"></div>
+        
         <div className="nav-item" style={{ pointerEvents: 'none', opacity: 0.7, marginTop: '0.5rem' }}>
           <span className="material-symbols-outlined sidebar-icon">folder</span>
           <span style={{ fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Collections</span>
@@ -68,15 +78,6 @@ export function Sidebar({ activeTab, setActiveTab, snippets, onNewSnippet }: Sid
           </div>
         ))}
         
-        <div className="sidebar-divider"></div>
-        
-        <div 
-          className={`nav-item ${activeTab === "trash" ? "active" : ""}`}
-          onClick={() => setActiveTab("trash")}
-        >
-          <span className="material-symbols-outlined sidebar-icon">delete</span>
-          <span>Trash</span>
-        </div>
       </nav>
         
       <div className="sidebar-bottom">

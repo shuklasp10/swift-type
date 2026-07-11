@@ -4,12 +4,6 @@ import { IconButton } from "../ui/IconButton";
 
 export function SnippetsView({ activeTab, snippets, onEdit, onDelete, onUpdate }: SnippetsViewProps) {
   const [sortBy, setSortBy] = useState<"name-asc" | "name-desc" | "usage-desc" | "updated-desc">("updated-desc");
-  const [filterCategory, setFilterCategory] = useState<string>("All");
-
-  const categories = useMemo(() => {
-    const cats = new Set(snippets.filter(s => !s.deleted_at).map(s => s.category || "General"));
-    return ["All", ...Array.from(cats).sort()];
-  }, [snippets]);
 
   const filteredAndSortedSnippets = useMemo(() => {
     let filtered = snippets.filter(s => {
@@ -22,11 +16,7 @@ export function SnippetsView({ activeTab, snippets, onEdit, onDelete, onUpdate }
       }
       return !s.deleted_at;
     });
-
-    if (filterCategory !== "All") {
-      filtered = filtered.filter(s => (s.category || "General") === filterCategory);
-    }
-
+    
     return filtered.sort((a, b) => {
       switch (sortBy) {
         case "name-asc":
@@ -41,7 +31,7 @@ export function SnippetsView({ activeTab, snippets, onEdit, onDelete, onUpdate }
           return 0;
       }
     });
-  }, [snippets, activeTab, filterCategory, sortBy]);
+  }, [snippets, activeTab, sortBy]);
 
   const getCategoryClass = (category?: string | null) => {
     switch (category?.toLowerCase()) {
@@ -73,9 +63,6 @@ export function SnippetsView({ activeTab, snippets, onEdit, onDelete, onUpdate }
     description = `Snippets in the ${title} collection.`;
   }
 
-  // Hide the category filter if we are inside a collection
-  const showCategoryFilter = !activeTab.startsWith("collection:");
-
   return (
     <>
       <div className="content-area content-area-padded">
@@ -85,16 +72,6 @@ export function SnippetsView({ activeTab, snippets, onEdit, onDelete, onUpdate }
             <p className="view-description">{description}</p>
           </div>
           <div className="view-actions" style={{ display: 'flex', gap: '8px' }}>
-            {showCategoryFilter && (
-              <select 
-                value={filterCategory} 
-                onChange={e => setFilterCategory(e.target.value)}
-                className="form-input"
-                style={{ width: 'auto', minWidth: '120px', padding: '4px 8px', fontSize: '13px', height: '32px' }}
-              >
-                {categories.map(cat => <option key={cat} value={cat}>{cat === "All" ? "All Categories" : cat}</option>)}
-              </select>
-            )}
             <select 
               value={sortBy} 
               onChange={e => setSortBy(e.target.value as any)}

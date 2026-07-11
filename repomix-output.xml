@@ -1260,6 +1260,16 @@ export function Sidebar({ activeTab, setActiveTab, snippets, onNewSnippet }: Sid
           <span>Favorites</span>
         </div>
         
+        <div 
+          className={`nav-item ${activeTab === "trash" ? "active" : ""}`}
+          onClick={() => setActiveTab("trash")}
+        >
+          <span className="material-symbols-outlined sidebar-icon">delete</span>
+          <span>Trash</span>
+        </div>
+
+        <div className="sidebar-divider"></div>
+        
         <div className="nav-item" style={{ pointerEvents: 'none', opacity: 0.7, marginTop: '0.5rem' }}>
           <span className="material-symbols-outlined sidebar-icon">folder</span>
           <span style={{ fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Collections</span>
@@ -1283,15 +1293,6 @@ export function Sidebar({ activeTab, setActiveTab, snippets, onNewSnippet }: Sid
           </div>
         ))}
         
-        <div className="sidebar-divider"></div>
-        
-        <div 
-          className={`nav-item ${activeTab === "trash" ? "active" : ""}`}
-          onClick={() => setActiveTab("trash")}
-        >
-          <span className="material-symbols-outlined sidebar-icon">delete</span>
-          <span>Trash</span>
-        </div>
       </nav>
         
       <div className="sidebar-bottom">
@@ -1526,12 +1527,6 @@ import { IconButton } from "../ui/IconButton";
 
 export function SnippetsView({ activeTab, snippets, onEdit, onDelete, onUpdate }: SnippetsViewProps) {
   const [sortBy, setSortBy] = useState<"name-asc" | "name-desc" | "usage-desc" | "updated-desc">("updated-desc");
-  const [filterCategory, setFilterCategory] = useState<string>("All");
-
-  const categories = useMemo(() => {
-    const cats = new Set(snippets.filter(s => !s.deleted_at).map(s => s.category || "General"));
-    return ["All", ...Array.from(cats).sort()];
-  }, [snippets]);
 
   const filteredAndSortedSnippets = useMemo(() => {
     let filtered = snippets.filter(s => {
@@ -1544,11 +1539,7 @@ export function SnippetsView({ activeTab, snippets, onEdit, onDelete, onUpdate }
       }
       return !s.deleted_at;
     });
-
-    if (filterCategory !== "All") {
-      filtered = filtered.filter(s => (s.category || "General") === filterCategory);
-    }
-
+    
     return filtered.sort((a, b) => {
       switch (sortBy) {
         case "name-asc":
@@ -1563,7 +1554,7 @@ export function SnippetsView({ activeTab, snippets, onEdit, onDelete, onUpdate }
           return 0;
       }
     });
-  }, [snippets, activeTab, filterCategory, sortBy]);
+  }, [snippets, activeTab, sortBy]);
 
   const getCategoryClass = (category?: string | null) => {
     switch (category?.toLowerCase()) {
@@ -1595,9 +1586,6 @@ export function SnippetsView({ activeTab, snippets, onEdit, onDelete, onUpdate }
     description = `Snippets in the ${title} collection.`;
   }
 
-  // Hide the category filter if we are inside a collection
-  const showCategoryFilter = !activeTab.startsWith("collection:");
-
   return (
     <>
       <div className="content-area content-area-padded">
@@ -1607,16 +1595,6 @@ export function SnippetsView({ activeTab, snippets, onEdit, onDelete, onUpdate }
             <p className="view-description">{description}</p>
           </div>
           <div className="view-actions" style={{ display: 'flex', gap: '8px' }}>
-            {showCategoryFilter && (
-              <select 
-                value={filterCategory} 
-                onChange={e => setFilterCategory(e.target.value)}
-                className="form-input"
-                style={{ width: 'auto', minWidth: '120px', padding: '4px 8px', fontSize: '13px', height: '32px' }}
-              >
-                {categories.map(cat => <option key={cat} value={cat}>{cat === "All" ? "All Categories" : cat}</option>)}
-              </select>
-            )}
             <select 
               value={sortBy} 
               onChange={e => setSortBy(e.target.value as any)}
@@ -2490,303 +2468,6 @@ strip = true
 @import './styles/EmptyState.css';
 </file>
 
-<file path="src/components/views/SettingsView.tsx">
-import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { AppSettings, SettingsViewProps } from "../../types";
-import { Button } from "../ui/Button";
-import { Toggle } from "../ui/Toggle";
-import { save, open } from "@tauri-apps/plugin-dialog";
-
-export function SettingsView({ settings, onSave }: SettingsViewProps) {
-  const [localSettings, setLocalSettings] = useState<AppSettings | null>(settings);
-  const [activeSection, setActiveSection] = useState<"behavior" | "data" | "appearance">("behavior");
-
-  useEffect(() => {
-    setLocalSettings(settings);
-  }, [settings]);
-
-  const updateSetting = async <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
-    if (!localSettings) return;
-    const newSettings = { ...localSettings, [key]: value };
-    setLocalSettings(newSettings); // Optimistic update
-    try {
-      await invoke("update_settings", { settings: newSettings });
-      onSave(); // Refresh parent state
-    } catch (err) {
-      console.error("Failed to save settings:", err);
-      setLocalSettings(localSettings); // Revert on failure
-    }
-  };
-
-  const handleExport = async () => {
-    try {
-      const filePath = await save({
-        filters: [{ name: 'SwiftType Backup', extensions: ['yml', 'yaml'] }],
-        defaultPath: 'swifttype_backup.yml',
-      });
-      if (filePath) {
-        await invoke("export_snippets", { path: filePath });
-        alert("Snippets exported successfully!");
-      }
-    } catch (err) {
-      console.error("Export failed:", err);
-      alert("Failed to export snippets.");
-    }
-  };
-
-  const handleImport = async () => {
-    try {
-      const filePath = await open({
-        filters: [{ name: 'SwiftType Backup', extensions: ['yml', 'yaml'] }],
-        multiple: false,
-      });
-      if (filePath) {
-        const merge = window.confirm("Do you want to MERGE these snippets with your existing ones?\n\n(Click 'OK' to MERGE, click 'Cancel' to OVERWRITE)");
-        await invoke("import_snippets", { path: filePath, merge });
-        onSave(); // trigger data reload
-        alert("Snippets imported successfully!");
-      }
-    } catch (err) {
-      console.error("Import failed:", err);
-      alert(`Failed to import snippets: ${err}`);
-    }
-  };
-
-  const handleEraseAll = async () => {
-    const confirmErase = window.confirm(
-      "DANGER: Are you absolutely sure you want to completely erase all your snippets and reset settings to their defaults?\n\nThis cannot be undone."
-    );
-    if (confirmErase) {
-      try {
-        await invoke("clear_all_data");
-        onSave(); // refresh data
-        alert("All data has been successfully erased.");
-      } catch (err) {
-        console.error("Failed to erase data:", err);
-        alert("Failed to erase data.");
-      }
-    }
-  };
-
-  const scrollToSection = (id: "behavior" | "data" | "appearance") => {
-    setActiveSection(id);
-    const element = document.getElementById(`section-${id}`);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
-  if (!localSettings) {
-    return <div className="content-area">Loading...</div>;
-  }
-
-  return (
-    <>
-      <div className="content-area content-area-padded">
-        <div className="view-header">
-          <div>
-            <h2 className="header-title">Settings</h2>
-            <p className="view-description">
-              Manage your app behavior and data preferences.
-            </p>
-          </div>
-        </div>
-
-        <div className="settings-layout">
-          {/* Left Navigation */}
-          <nav className="settings-nav">
-            <button 
-              className={`settings-nav-item ${activeSection === "behavior" ? "active" : ""}`}
-              onClick={() => scrollToSection("behavior")}
-            >
-              <span className="material-symbols-outlined icon-md">tune</span>
-              App Behavior
-            </button>
-            <button 
-              className={`settings-nav-item ${activeSection === "data" ? "active" : ""}`}
-              onClick={() => scrollToSection("data")}
-            >
-              <span className="material-symbols-outlined icon-md">storage</span>
-              Data Management
-            </button>
-            <button 
-              className={`settings-nav-item ${activeSection === "appearance" ? "active" : ""}`}
-              onClick={() => scrollToSection("appearance")}
-            >
-              <span className="material-symbols-outlined icon-md">palette</span>
-              Appearance
-            </button>
-          </nav>
-
-          {/* Right Content */}
-          <div className="settings-content">
-            
-            {/* App Behavior Card */}
-            <div id="section-behavior" className="settings-card">
-              <div className="settings-card-header">
-                <span className="material-symbols-outlined icon-primary">tune</span>
-                <h3 className="settings-card-title">App Behavior</h3>
-              </div>
-
-              <div className="settings-row">
-                <div className="settings-row-info">
-                  <h4>Launch at Startup</h4>
-                  <p>Automatically open SnippetFlow when you log in.</p>
-                </div>
-                <Toggle
-                  active={localSettings.start_with_windows}
-                  onClick={() => updateSetting("start_with_windows", !localSettings.start_with_windows)}
-                />
-              </div>
-
-              <div className="settings-row" style={{ borderTop: "1px solid var(--border-color)" }}>
-                <div className="settings-row-info">
-                  <h4>Background Sync</h4>
-                  <p>Keep snippets updated in the background.</p>
-                </div>
-                <Toggle
-                  active={localSettings.show_in_tray}
-                  onClick={() => updateSetting("show_in_tray", !localSettings.show_in_tray)}
-                />
-              </div>
-
-              <div className="slider-container">
-                <div className="slider-header">
-                  <h4>Auto-Expansion Delay</h4>
-                  <span className="slider-value">{localSettings.undo_backspace_ms}ms</span>
-                </div>
-                <input 
-                  type="range" 
-                  className="range-slider" 
-                  min="0" max="1000" step="50"
-                  value={localSettings.undo_backspace_ms}
-                  onChange={(e) => updateSetting("undo_backspace_ms", parseInt(e.target.value))}
-                />
-                <div className="slider-labels">
-                  <span>Fast (0ms)</span>
-                  <span>Slow (1s)</span>
-                </div>
-              </div>
-
-              <div className="settings-row settings-row-bordered mt-sm">
-                <div className="settings-row-info">
-                  <h4>Injection Method</h4>
-                  <p>How snippets are typed out.</p>
-                </div>
-                <select
-                  className="form-input"
-                  style={{ width: "200px" }}
-                  value={localSettings.injection_method}
-                  onChange={(e) => updateSetting("injection_method", e.target.value)}
-                >
-                  <option value="auto">Auto (Recommended)</option>
-                  <option value="keystrokes">Keystrokes</option>
-                  <option value="clipboard">Clipboard</option>
-                </select>
-              </div>
-
-              <div className="settings-row" style={{ borderTop: "1px solid var(--border-color)" }}>
-                <div className="settings-row-info">
-                  <h4>Search Hotkey</h4>
-                  <p>Global shortcut to open search.</p>
-                </div>
-                <input
-                  type="text"
-                  className="form-input"
-                  style={{ width: "200px" }}
-                  value={localSettings.search_hotkey}
-                  onChange={(e) => updateSetting("search_hotkey", e.target.value)}
-                />
-              </div>
-            </div>
-
-            {/* Data Management Card */}
-            <div id="section-data" className="settings-card">
-              <div className="settings-card-header">
-                <span className="material-symbols-outlined icon-primary">storage</span>
-                <h3 className="settings-card-title">Data Management</h3>
-              </div>
-              <p className="settings-card-desc">
-                Create local backups and restore your snippets.
-              </p>
-
-              <div className="action-cards-grid">
-                <div className="action-card">
-                  <div className="action-card-header">
-                    <span className="material-symbols-outlined">download</span>
-                    <h4>Export Backup</h4>
-                  </div>
-                  <p>Download all snippets as a YAML file.</p>
-                  <Button variant="secondary" className="action-btn-outline" onClick={handleExport}>
-                    Export Backup...
-                  </Button>
-                </div>
-
-                <div className="action-card">
-                  <div className="action-card-header">
-                    <span className="material-symbols-outlined">upload</span>
-                    <h4>Restore Backup</h4>
-                  </div>
-                  <p>Import snippets from a YAML backup.</p>
-                  <Button variant="secondary" className="action-btn-danger" onClick={handleImport}>
-                    Restore Backup...
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Appearance Card */}
-            <div id="section-appearance" className="settings-card">
-              <div className="settings-card-header">
-                <span className="material-symbols-outlined icon-primary">palette</span>
-                <h3 className="settings-card-title">Appearance</h3>
-              </div>
-
-              <div className="settings-row">
-                <div className="settings-row-info">
-                  <h4>Theme</h4>
-                  <p>Choose your preferred color theme.</p>
-                </div>
-                <select
-                  className="form-input"
-                  style={{ width: "200px" }}
-                  value={localSettings.theme}
-                  onChange={(e) => updateSetting("theme", e.target.value)}
-                >
-                  <option value="dark">Dark</option>
-                  <option value="light">Light</option>
-                  <option value="system">System</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Danger Zone Card */}
-            <div id="section-danger" className="settings-card danger-card">
-              <div className="settings-card-header danger-card-header">
-                <span className="material-symbols-outlined danger-icon">error</span>
-                <h3 className="settings-card-title danger-title">Danger Zone</h3>
-              </div>
-
-              <div className="settings-row danger-row">
-                <div className="settings-row-info">
-                  <h4 className="danger-row-title">Delete All Data</h4>
-                  <p>Permanently delete all local snippets and reset application settings. This action cannot be undone.</p>
-                </div>
-                <Button variant="secondary" className="action-btn-danger" onClick={handleEraseAll}>
-                  Reset All
-                </Button>
-              </div>
-            </div>
-            
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-</file>
-
 <file path="src-tauri/src/text_injector.rs">
 //! Text Injector Module
 //!
@@ -3543,6 +3224,303 @@ function App() {
 export default App;
 </file>
 
+<file path="src/components/views/SettingsView.tsx">
+import { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { AppSettings, SettingsViewProps } from "../../types";
+import { Button } from "../ui/Button";
+import { Toggle } from "../ui/Toggle";
+import { save, open, confirm } from "@tauri-apps/plugin-dialog";
+
+export function SettingsView({ settings, onSave }: SettingsViewProps) {
+  const [localSettings, setLocalSettings] = useState<AppSettings | null>(settings);
+  const [activeSection, setActiveSection] = useState<"behavior" | "data" | "appearance">("behavior");
+
+  useEffect(() => {
+    setLocalSettings(settings);
+  }, [settings]);
+
+  const updateSetting = async <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
+    if (!localSettings) return;
+    const newSettings = { ...localSettings, [key]: value };
+    setLocalSettings(newSettings); // Optimistic update
+    try {
+      await invoke("update_settings", { settings: newSettings });
+      onSave(); // Refresh parent state
+    } catch (err) {
+      console.error("Failed to save settings:", err);
+      setLocalSettings(localSettings); // Revert on failure
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      const filePath = await save({
+        filters: [{ name: 'SwiftType Backup', extensions: ['yml', 'yaml'] }],
+        defaultPath: 'swifttype_backup.yml',
+      });
+      if (filePath) {
+        await invoke("export_snippets", { path: filePath });
+        alert("Snippets exported successfully!");
+      }
+    } catch (err) {
+      console.error("Export failed:", err);
+      alert("Failed to export snippets.");
+    }
+  };
+
+  const handleImport = async () => {
+    try {
+      const filePath = await open({
+        filters: [{ name: 'SwiftType Backup', extensions: ['yml', 'yaml'] }],
+        multiple: false,
+      });
+      if (filePath) {
+        const merge = await confirm("Do you want to MERGE these snippets with your existing ones?\n\n(Click 'OK' to MERGE, click 'Cancel' to OVERWRITE)");
+        await invoke("import_snippets", { path: String(filePath), merge: merge === true });
+        onSave(); // trigger data reload
+        alert("Snippets imported successfully!");
+      }
+    } catch (err) {
+      console.error("Import failed:", err);
+      alert(`Failed to import snippets: ${err}`);
+    }
+  };
+
+  const handleEraseAll = async () => {
+    const confirmErase = window.confirm(
+      "DANGER: Are you absolutely sure you want to completely erase all your snippets and reset settings to their defaults?\n\nThis cannot be undone."
+    );
+    if (confirmErase) {
+      try {
+        await invoke("clear_all_data");
+        onSave(); // refresh data
+        alert("All data has been successfully erased.");
+      } catch (err) {
+        console.error("Failed to erase data:", err);
+        alert("Failed to erase data.");
+      }
+    }
+  };
+
+  const scrollToSection = (id: "behavior" | "data" | "appearance") => {
+    setActiveSection(id);
+    const element = document.getElementById(`section-${id}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  if (!localSettings) {
+    return <div className="content-area">Loading...</div>;
+  }
+
+  return (
+    <>
+      <div className="content-area content-area-padded">
+        <div className="view-header">
+          <div>
+            <h2 className="header-title">Settings</h2>
+            <p className="view-description">
+              Manage your app behavior and data preferences.
+            </p>
+          </div>
+        </div>
+
+        <div className="settings-layout">
+          {/* Left Navigation */}
+          <nav className="settings-nav">
+            <button 
+              className={`settings-nav-item ${activeSection === "behavior" ? "active" : ""}`}
+              onClick={() => scrollToSection("behavior")}
+            >
+              <span className="material-symbols-outlined icon-md">tune</span>
+              App Behavior
+            </button>
+            <button 
+              className={`settings-nav-item ${activeSection === "data" ? "active" : ""}`}
+              onClick={() => scrollToSection("data")}
+            >
+              <span className="material-symbols-outlined icon-md">storage</span>
+              Data Management
+            </button>
+            <button 
+              className={`settings-nav-item ${activeSection === "appearance" ? "active" : ""}`}
+              onClick={() => scrollToSection("appearance")}
+            >
+              <span className="material-symbols-outlined icon-md">palette</span>
+              Appearance
+            </button>
+          </nav>
+
+          {/* Right Content */}
+          <div className="settings-content">
+            
+            {/* App Behavior Card */}
+            <div id="section-behavior" className="settings-card">
+              <div className="settings-card-header">
+                <span className="material-symbols-outlined icon-primary">tune</span>
+                <h3 className="settings-card-title">App Behavior</h3>
+              </div>
+
+              <div className="settings-row">
+                <div className="settings-row-info">
+                  <h4>Launch at Startup</h4>
+                  <p>Automatically open SnippetFlow when you log in.</p>
+                </div>
+                <Toggle
+                  active={localSettings.start_with_windows}
+                  onClick={() => updateSetting("start_with_windows", !localSettings.start_with_windows)}
+                />
+              </div>
+
+              <div className="settings-row" style={{ borderTop: "1px solid var(--border-color)" }}>
+                <div className="settings-row-info">
+                  <h4>Background Sync</h4>
+                  <p>Keep snippets updated in the background.</p>
+                </div>
+                <Toggle
+                  active={localSettings.show_in_tray}
+                  onClick={() => updateSetting("show_in_tray", !localSettings.show_in_tray)}
+                />
+              </div>
+
+              <div className="slider-container">
+                <div className="slider-header">
+                  <h4>Auto-Expansion Delay</h4>
+                  <span className="slider-value">{localSettings.undo_backspace_ms}ms</span>
+                </div>
+                <input 
+                  type="range" 
+                  className="range-slider" 
+                  min="0" max="1000" step="50"
+                  value={localSettings.undo_backspace_ms}
+                  onChange={(e) => updateSetting("undo_backspace_ms", parseInt(e.target.value))}
+                />
+                <div className="slider-labels">
+                  <span>Fast (0ms)</span>
+                  <span>Slow (1s)</span>
+                </div>
+              </div>
+
+              <div className="settings-row settings-row-bordered mt-sm">
+                <div className="settings-row-info">
+                  <h4>Injection Method</h4>
+                  <p>How snippets are typed out.</p>
+                </div>
+                <select
+                  className="form-input"
+                  style={{ width: "200px" }}
+                  value={localSettings.injection_method}
+                  onChange={(e) => updateSetting("injection_method", e.target.value)}
+                >
+                  <option value="auto">Auto (Recommended)</option>
+                  <option value="keystrokes">Keystrokes</option>
+                  <option value="clipboard">Clipboard</option>
+                </select>
+              </div>
+
+              <div className="settings-row" style={{ borderTop: "1px solid var(--border-color)" }}>
+                <div className="settings-row-info">
+                  <h4>Search Hotkey</h4>
+                  <p>Global shortcut to open search.</p>
+                </div>
+                <input
+                  type="text"
+                  className="form-input"
+                  style={{ width: "200px" }}
+                  value={localSettings.search_hotkey}
+                  onChange={(e) => updateSetting("search_hotkey", e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Data Management Card */}
+            <div id="section-data" className="settings-card">
+              <div className="settings-card-header">
+                <span className="material-symbols-outlined icon-primary">storage</span>
+                <h3 className="settings-card-title">Data Management</h3>
+              </div>
+              <p className="settings-card-desc">
+                Create local backups and restore your snippets.
+              </p>
+
+              <div className="action-cards-grid">
+                <div className="action-card">
+                  <div className="action-card-header">
+                    <span className="material-symbols-outlined">download</span>
+                    <h4>Export Backup</h4>
+                  </div>
+                  <p>Download all snippets as a YAML file.</p>
+                  <Button variant="secondary" className="action-btn-outline" onClick={handleExport}>
+                    Export Backup...
+                  </Button>
+                </div>
+
+                <div className="action-card">
+                  <div className="action-card-header">
+                    <span className="material-symbols-outlined">upload</span>
+                    <h4>Restore Backup</h4>
+                  </div>
+                  <p>Import snippets from a YAML backup.</p>
+                  <Button variant="secondary" className="action-btn-danger" onClick={handleImport}>
+                    Restore Backup...
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Appearance Card */}
+            <div id="section-appearance" className="settings-card">
+              <div className="settings-card-header">
+                <span className="material-symbols-outlined icon-primary">palette</span>
+                <h3 className="settings-card-title">Appearance</h3>
+              </div>
+
+              <div className="settings-row">
+                <div className="settings-row-info">
+                  <h4>Theme</h4>
+                  <p>Choose your preferred color theme.</p>
+                </div>
+                <select
+                  className="form-input"
+                  style={{ width: "200px" }}
+                  value={localSettings.theme}
+                  onChange={(e) => updateSetting("theme", e.target.value)}
+                >
+                  <option value="dark">Dark</option>
+                  <option value="light">Light</option>
+                  <option value="system">System</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Danger Zone Card */}
+            <div id="section-danger" className="settings-card danger-card">
+              <div className="settings-card-header danger-card-header">
+                <span className="material-symbols-outlined danger-icon">error</span>
+                <h3 className="settings-card-title danger-title">Danger Zone</h3>
+              </div>
+
+              <div className="settings-row danger-row">
+                <div className="settings-row-info">
+                  <h4 className="danger-row-title">Delete All Data</h4>
+                  <p>Permanently delete all local snippets and reset application settings. This action cannot be undone.</p>
+                </div>
+                <Button variant="secondary" className="action-btn-danger" onClick={handleEraseAll}>
+                  Reset All
+                </Button>
+              </div>
+            </div>
+            
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+</file>
+
 <file path="package.json">
 {
   "name": "tauri-app",
@@ -3576,6 +3554,215 @@ export default App;
     "typescript": "~5.8.3",
     "vite": "^7.0.4"
   }
+}
+</file>
+
+<file path="src-tauri/src/keyboard_hook.rs">
+//! Keyboard Hook Module
+//!
+//! Implements a global low-level keyboard hook using Windows API
+//! to capture keystrokes for text expansion functionality.
+
+use once_cell::sync::Lazy;
+use once_cell::sync::OnceCell;
+use parking_lot::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::Sender;
+use windows::Win32::Foundation::{HINSTANCE, LPARAM, LRESULT, WPARAM};
+use windows::Win32::UI::WindowsAndMessaging::{
+    CallNextHookEx, SetWindowsHookExW, UnhookWindowsHookEx, HC_ACTION, HHOOK, KBDLLHOOKSTRUCT,
+    LLKHF_INJECTED, LLKHF_LOWER_IL_INJECTED, WH_KEYBOARD_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
+};
+
+/// Keyboard event sent to the worker thread
+#[derive(Debug, Clone, Copy)]
+pub enum HookEvent {
+    Char(char),
+    Backspace,
+    Clear,
+}
+
+/// Wrapper for HHOOK to make it Send + Sync safe
+struct SendHHOOK(HHOOK);
+unsafe impl Send for SendHHOOK {}
+unsafe impl Sync for SendHHOOK {}
+
+/// Global hook handle
+static HOOK_HANDLE: Lazy<Mutex<Option<SendHHOOK>>> = Lazy::new(|| Mutex::new(None));
+
+/// Global sender for passing keystrokes to the worker thread
+static HOOK_SENDER: OnceCell<Sender<HookEvent>> = OnceCell::new();
+
+/// Flag to indicate if we're currently injecting text (to avoid recursive hooks)
+static IS_INJECTING: AtomicBool = AtomicBool::new(false);
+
+/// Virtual key codes for printable characters
+const VK_BACK: u32 = 0x08;
+const VK_RETURN: u32 = 0x0D;
+const VK_TAB: u32 = 0x09;
+const VK_ESCAPE: u32 = 0x1B;
+
+/// Set the channel sender for keyboard events
+pub fn set_event_sender(sender: Sender<HookEvent>) -> Result<(), &'static str> {
+    HOOK_SENDER.set(sender).map_err(|_| "Sender already set")
+}
+
+/// Set the injecting flag to prevent hook recursion
+pub fn set_injecting(value: bool) {
+    IS_INJECTING.store(value, Ordering::SeqCst);
+}
+
+/// Check if we're currently injecting
+pub fn is_injecting() -> bool {
+    IS_INJECTING.load(Ordering::SeqCst)
+}
+
+/// Convert virtual key code to character using current keyboard layout
+fn vk_to_char(vk_code: u32, scan_code: u32) -> Option<char> {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{
+        GetAsyncKeyState, GetKeyboardState, ToUnicode,
+    };
+
+    let mut keyboard_state = [0u8; 256];
+    let _ = unsafe { GetKeyboardState(&mut keyboard_state) };
+
+    const VK_SHIFT: i32 = 0x10;
+    const VK_CONTROL: i32 = 0x11;
+    const VK_MENU: i32 = 0x12;
+    const VK_CAPITAL: i32 = 0x14;
+
+    unsafe {
+        // High bit for pressed state
+        keyboard_state[VK_SHIFT as usize] = if GetAsyncKeyState(VK_SHIFT) < 0 {
+            0x80
+        } else {
+            0
+        };
+        keyboard_state[VK_CONTROL as usize] = if GetAsyncKeyState(VK_CONTROL) < 0 {
+            0x80
+        } else {
+            0
+        };
+        keyboard_state[VK_MENU as usize] = if GetAsyncKeyState(VK_MENU) < 0 {
+            0x80
+        } else {
+            0
+        };
+
+        // Low bit for toggled state (CapsLock)
+        let caps_state = GetAsyncKeyState(VK_CAPITAL);
+        keyboard_state[VK_CAPITAL as usize] = if (caps_state & 1) != 0 { 1 } else { 0 };
+    }
+
+    let mut buffer = [0u16; 4];
+    let result = unsafe { ToUnicode(vk_code, scan_code, Some(&keyboard_state), &mut buffer, 0) };
+
+    if result > 0 {
+        if let Ok(s) = String::from_utf16(&buffer[0..(result as usize)]) {
+            if let Some(ch) = s.chars().next() {
+                // Filter out non-printable / control characters
+                if !ch.is_control() {
+                    return Some(ch);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Low-level keyboard hook callback
+unsafe extern "system" fn keyboard_hook_callback(
+    n_code: i32,
+    w_param: WPARAM,
+    l_param: LPARAM,
+) -> LRESULT {
+    // If we're injecting, skip processing entirely - don't send to channel
+    if is_injecting() {
+        return CallNextHookEx(None, n_code, w_param, l_param);
+    }
+
+    if n_code == HC_ACTION as i32 {
+        let kbd_struct = &*(l_param.0 as *const KBDLLHOOKSTRUCT);
+
+        // Also skip injected keys from any process (belt + suspenders)
+        let flags = kbd_struct.flags.0;
+        if (flags & LLKHF_INJECTED.0) != 0 || (flags & LLKHF_LOWER_IL_INJECTED.0) != 0 {
+            return CallNextHookEx(None, n_code, w_param, l_param);
+        }
+
+        let msg_type = w_param.0 as u32;
+        if msg_type == WM_KEYDOWN || msg_type == WM_SYSKEYDOWN {
+            let vk_code = kbd_struct.vkCode;
+
+            match vk_code {
+                VK_BACK => {
+                    if let Some(sender) = HOOK_SENDER.get() {
+                        let _ = sender.send(HookEvent::Backspace);
+                    }
+                }
+                VK_RETURN | VK_ESCAPE | VK_TAB => {
+                    if let Some(sender) = HOOK_SENDER.get() {
+                        let _ = sender.send(HookEvent::Clear);
+                    }
+                }
+                _ => {
+                    let scan_code = kbd_struct.scanCode;
+                    if let Some(ch) = vk_to_char(vk_code, scan_code) {
+                        if let Some(sender) = HOOK_SENDER.get() {
+                            let _ = sender.send(HookEvent::Char(ch));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Always pass to the next hook. We never block keystrokes here to avoid deadlocks.
+    CallNextHookEx(None, n_code, w_param, l_param)
+}
+
+/// Install the keyboard hook
+pub fn install_hook() -> Result<(), String> {
+    let mut handle = HOOK_HANDLE.lock();
+
+    if handle.is_some() {
+        return Err("Hook already installed".to_string());
+    }
+
+    unsafe {
+        let hook = SetWindowsHookExW(
+            WH_KEYBOARD_LL,
+            Some(keyboard_hook_callback),
+            HINSTANCE::default(),
+            0,
+        )
+        .map_err(|e| format!("Failed to install hook: {:?}", e))?;
+
+        *handle = Some(SendHHOOK(hook));
+    }
+
+    log::info!("Keyboard hook installed successfully");
+    Ok(())
+}
+
+/// Uninstall the keyboard hook
+#[allow(dead_code)]
+pub fn uninstall_hook() -> Result<(), String> {
+    let mut handle = HOOK_HANDLE.lock();
+
+    if let Some(SendHHOOK(hook)) = handle.take() {
+        unsafe {
+            UnhookWindowsHookEx(hook).map_err(|e| format!("Failed to uninstall hook: {:?}", e))?;
+        }
+        log::info!("Keyboard hook uninstalled");
+    }
+
+    Ok(())
+}
+
+/// Check if hook is installed
+pub fn is_hook_installed() -> bool {
+    HOOK_HANDLE.lock().is_some()
 }
 </file>
 
@@ -4016,215 +4203,6 @@ fn create_default_config() -> Config {
 }
 
 // Add dirs crate dependency - this will be added to Cargo.toml
-</file>
-
-<file path="src-tauri/src/keyboard_hook.rs">
-//! Keyboard Hook Module
-//!
-//! Implements a global low-level keyboard hook using Windows API
-//! to capture keystrokes for text expansion functionality.
-
-use once_cell::sync::Lazy;
-use once_cell::sync::OnceCell;
-use parking_lot::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::Sender;
-use windows::Win32::Foundation::{HINSTANCE, LPARAM, LRESULT, WPARAM};
-use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, SetWindowsHookExW, UnhookWindowsHookEx, HC_ACTION, HHOOK, KBDLLHOOKSTRUCT,
-    LLKHF_INJECTED, LLKHF_LOWER_IL_INJECTED, WH_KEYBOARD_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
-};
-
-/// Keyboard event sent to the worker thread
-#[derive(Debug, Clone, Copy)]
-pub enum HookEvent {
-    Char(char),
-    Backspace,
-    Clear,
-}
-
-/// Wrapper for HHOOK to make it Send + Sync safe
-struct SendHHOOK(HHOOK);
-unsafe impl Send for SendHHOOK {}
-unsafe impl Sync for SendHHOOK {}
-
-/// Global hook handle
-static HOOK_HANDLE: Lazy<Mutex<Option<SendHHOOK>>> = Lazy::new(|| Mutex::new(None));
-
-/// Global sender for passing keystrokes to the worker thread
-static HOOK_SENDER: OnceCell<Sender<HookEvent>> = OnceCell::new();
-
-/// Flag to indicate if we're currently injecting text (to avoid recursive hooks)
-static IS_INJECTING: AtomicBool = AtomicBool::new(false);
-
-/// Virtual key codes for printable characters
-const VK_BACK: u32 = 0x08;
-const VK_RETURN: u32 = 0x0D;
-const VK_TAB: u32 = 0x09;
-const VK_ESCAPE: u32 = 0x1B;
-
-/// Set the channel sender for keyboard events
-pub fn set_event_sender(sender: Sender<HookEvent>) -> Result<(), &'static str> {
-    HOOK_SENDER.set(sender).map_err(|_| "Sender already set")
-}
-
-/// Set the injecting flag to prevent hook recursion
-pub fn set_injecting(value: bool) {
-    IS_INJECTING.store(value, Ordering::SeqCst);
-}
-
-/// Check if we're currently injecting
-pub fn is_injecting() -> bool {
-    IS_INJECTING.load(Ordering::SeqCst)
-}
-
-/// Convert virtual key code to character using current keyboard layout
-fn vk_to_char(vk_code: u32, scan_code: u32) -> Option<char> {
-    use windows::Win32::UI::Input::KeyboardAndMouse::{
-        GetAsyncKeyState, GetKeyboardState, ToUnicode,
-    };
-
-    let mut keyboard_state = [0u8; 256];
-    let _ = unsafe { GetKeyboardState(&mut keyboard_state) };
-
-    const VK_SHIFT: i32 = 0x10;
-    const VK_CONTROL: i32 = 0x11;
-    const VK_MENU: i32 = 0x12;
-    const VK_CAPITAL: i32 = 0x14;
-
-    unsafe {
-        // High bit for pressed state
-        keyboard_state[VK_SHIFT as usize] = if GetAsyncKeyState(VK_SHIFT) < 0 {
-            0x80
-        } else {
-            0
-        };
-        keyboard_state[VK_CONTROL as usize] = if GetAsyncKeyState(VK_CONTROL) < 0 {
-            0x80
-        } else {
-            0
-        };
-        keyboard_state[VK_MENU as usize] = if GetAsyncKeyState(VK_MENU) < 0 {
-            0x80
-        } else {
-            0
-        };
-
-        // Low bit for toggled state (CapsLock)
-        let caps_state = GetAsyncKeyState(VK_CAPITAL);
-        keyboard_state[VK_CAPITAL as usize] = if (caps_state & 1) != 0 { 1 } else { 0 };
-    }
-
-    let mut buffer = [0u16; 4];
-    let result = unsafe { ToUnicode(vk_code, scan_code, Some(&keyboard_state), &mut buffer, 0) };
-
-    if result > 0 {
-        if let Ok(s) = String::from_utf16(&buffer[0..(result as usize)]) {
-            if let Some(ch) = s.chars().next() {
-                // Filter out non-printable / control characters
-                if !ch.is_control() {
-                    return Some(ch);
-                }
-            }
-        }
-    }
-    None
-}
-
-/// Low-level keyboard hook callback
-unsafe extern "system" fn keyboard_hook_callback(
-    n_code: i32,
-    w_param: WPARAM,
-    l_param: LPARAM,
-) -> LRESULT {
-    // If we're injecting, skip processing entirely - don't send to channel
-    if is_injecting() {
-        return CallNextHookEx(None, n_code, w_param, l_param);
-    }
-
-    if n_code == HC_ACTION as i32 {
-        let kbd_struct = &*(l_param.0 as *const KBDLLHOOKSTRUCT);
-
-        // Also skip injected keys from any process (belt + suspenders)
-        let flags = kbd_struct.flags.0;
-        if (flags & LLKHF_INJECTED.0) != 0 || (flags & LLKHF_LOWER_IL_INJECTED.0) != 0 {
-            return CallNextHookEx(None, n_code, w_param, l_param);
-        }
-
-        let msg_type = w_param.0 as u32;
-        if msg_type == WM_KEYDOWN || msg_type == WM_SYSKEYDOWN {
-            let vk_code = kbd_struct.vkCode;
-
-            match vk_code {
-                VK_BACK => {
-                    if let Some(sender) = HOOK_SENDER.get() {
-                        let _ = sender.send(HookEvent::Backspace);
-                    }
-                }
-                VK_RETURN | VK_ESCAPE | VK_TAB => {
-                    if let Some(sender) = HOOK_SENDER.get() {
-                        let _ = sender.send(HookEvent::Clear);
-                    }
-                }
-                _ => {
-                    let scan_code = kbd_struct.scanCode;
-                    if let Some(ch) = vk_to_char(vk_code, scan_code) {
-                        if let Some(sender) = HOOK_SENDER.get() {
-                            let _ = sender.send(HookEvent::Char(ch));
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Always pass to the next hook. We never block keystrokes here to avoid deadlocks.
-    CallNextHookEx(None, n_code, w_param, l_param)
-}
-
-/// Install the keyboard hook
-pub fn install_hook() -> Result<(), String> {
-    let mut handle = HOOK_HANDLE.lock();
-
-    if handle.is_some() {
-        return Err("Hook already installed".to_string());
-    }
-
-    unsafe {
-        let hook = SetWindowsHookExW(
-            WH_KEYBOARD_LL,
-            Some(keyboard_hook_callback),
-            HINSTANCE::default(),
-            0,
-        )
-        .map_err(|e| format!("Failed to install hook: {:?}", e))?;
-
-        *handle = Some(SendHHOOK(hook));
-    }
-
-    log::info!("Keyboard hook installed successfully");
-    Ok(())
-}
-
-/// Uninstall the keyboard hook
-#[allow(dead_code)]
-pub fn uninstall_hook() -> Result<(), String> {
-    let mut handle = HOOK_HANDLE.lock();
-
-    if let Some(SendHHOOK(hook)) = handle.take() {
-        unsafe {
-            UnhookWindowsHookEx(hook).map_err(|e| format!("Failed to uninstall hook: {:?}", e))?;
-        }
-        log::info!("Keyboard hook uninstalled");
-    }
-
-    Ok(())
-}
-
-/// Check if hook is installed
-pub fn is_hook_installed() -> bool {
-    HOOK_HANDLE.lock().is_some()
-}
 </file>
 
 <file path="src-tauri/src/lib.rs">

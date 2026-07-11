@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { AppSettings, SettingsViewProps } from "../../types";
 import { Button } from "../ui/Button";
 import { Toggle } from "../ui/Toggle";
-import { save, open } from "@tauri-apps/plugin-dialog";
+import { save, open, confirm } from "@tauri-apps/plugin-dialog";
 
 export function SettingsView({ settings, onSave }: SettingsViewProps) {
   const [localSettings, setLocalSettings] = useState<AppSettings | null>(settings);
