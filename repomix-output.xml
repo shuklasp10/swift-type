@@ -52,6 +52,7 @@ scripts/sync-version.js
 src-tauri/.gitignore
 src-tauri/build.rs
 src-tauri/capabilities/default.json
+src-tauri/capabilities/desktop.json
 src-tauri/Cargo.toml
 src-tauri/src/config.rs
 src-tauri/src/keyboard_hook.rs
@@ -91,10 +92,458 @@ vite.config.ts
 <files>
 This section contains the contents of the repository's files.
 
+<file path="src-tauri/capabilities/desktop.json">
+{
+  "identifier": "desktop-capability",
+  "platforms": [
+    "macOS",
+    "windows",
+    "linux"
+  ],
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "autostart:default"
+  ]
+}
+</file>
+
+<file path=".github/workflows/release.yaml">
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# Workflow-level permissions — required for GITHUB_TOKEN to create releases.
+# Also verify Settings → Actions → General → Workflow permissions is "Read and write".
+permissions:
+  contents: write
+
+# Prevent duplicate releases if tags are pushed in quick succession
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish-tauri:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # Determine bundle targets and release flags from the tag.
+      # MSI (WiX) only supports X.Y.Z versions — pre-release tags like
+      # "alpha.0" are invalid. Skip MSI for pre-release builds.
+      - name: Determine release parameters
+        id: params
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}" -replace '^v', ''
+          if ($tag -match '-') {
+            # Pre-release tag (e.g. 1.4.2-alpha.0) — NSIS only, mark as prerelease
+            "bundles=nsis" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            "prerelease=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          } else {
+            # Stable tag (e.g. 1.4.2) — both NSIS and MSI
+            "bundles=nsis,msi" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            "prerelease=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          }
+
+      - name: Extract changelog for this version
+        id: changelog
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}" -replace '^v', ''
+          $body = "See the assets below to download and install this version."
+          if (Test-Path CHANGELOG.md) {
+            $content = Get-Content CHANGELOG.md -Raw
+            if ($content -match "(?ms)## \[$tag\].*?\n(.*?)(?=\n## \[|$)") {
+              $extracted = $Matches[1].Trim()
+              if ($extracted) { $body = $extracted }
+            }
+          }
+          "body<<CHANGELOG_EOF" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          $body | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "CHANGELOG_EOF" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      # tauri-action runs `beforeBuildCommand` (npm run build) internally before
+      # invoking cargo. No need to build separately — that just doubles the time.
+      - name: Build and release Tauri app
+        uses: tauri-apps/tauri-action@v0.5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: SwiftType ${{ github.ref_name }}
+          releaseBody: |
+            ## What's New in ${{ github.ref_name }}
+
+            ${{ steps.changelog.outputs.body }}
+
+            ### Installation
+            - **EXE installer (recommended):** Download the `_x64-setup.exe` file
+            - **MSI installer:** Download the `_x64_en-US.msi` file
+          releaseDraft: false
+          prerelease: ${{ steps.params.outputs.prerelease == 'true' }}
+          tauriScript: npx tauri
+          args: --bundles ${{ steps.params.outputs.bundles }}
+
+      # If the release step fails after build succeeds, preserve artifacts
+      - name: Upload build artifacts (fallback)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts-${{ github.ref_name }}
+          path: |
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*-setup.exe
+          retention-days: 7
+</file>
+
+<file path=".gitignore">
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+</file>
+
+<file path="CHANGELOG.md">
+# Changelog
+
+## [0.1.1-alpha.0] - 2026-07-10
+
+- ci: add github release workflow
+- chore: setup automated versioning and changelog generation
+- Phase 5: Code Cleanup & Final Testing
+- Phase 4: System Tray Integration
+- Phase 3: Non-Destructive Clipboard Handling
+- Phase 2: Native Internationalization & Layout Support
+- Phase 1: Asynchronous Keyboard Hook Architecture
+- chore: setup repomix and configuration
+- initial commit
+
+All notable changes to this project will be documented in this file.
+</file>
+
+<file path="README.md">
+# SwiftType ⚡
+
+A modern, lightweight text expander for Windows. Alternative to Espanso with a beautiful UI.
+
+![Dark Theme](https://img.shields.io/badge/theme-dark-1a1a20)
+![Rust Backend](https://img.shields.io/badge/backend-Rust-orange)
+![React Frontend](https://img.shields.io/badge/frontend-React-61dafb)
+
+## Features
+
+- **🚀 Fast & Lightweight** - Built with Rust and Tauri
+- **✨ Modern UI** - Dark theme with glassmorphism effects
+- **⌨️ Global Hotkeys** - Works in any application
+- **📝 YAML Config** - Espanso-compatible format
+- **🔄 Variable Expansion** - Date, time, clipboard, and more
+- **🎯 Regex Triggers** - Advanced pattern matching
+
+## Installation
+
+### Prerequisites
+
+- [Rust](https://rustup.rs/) 1.70+
+- [Node.js](https://nodejs.org/) 18+
+- [VS Build Tools 2022](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022) with C++ workload
+
+### Build from Source
+
+```powershell
+git clone https://github.com/yourusername/SwiftType.git
+cd SwiftType
+npm install
+npm run tauri dev
+```
+
+## Usage
+
+### Creating Snippets
+
+1. Open SwiftType
+2. Click **New Snippet**
+3. Set a trigger (e.g., `:hello`)
+4. Set the replacement text
+5. Click **Create Snippet**
+
+### Typing Triggers
+
+Type your trigger in any application and it will automatically expand!
+
+```
+:hello → Hello, World!
+:date  → 2026-02-05
+:sig   → Your signature text
+```
+
+### Supported Variables
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `{{date}}` | Current date | 2026-02-05 |
+| `{{time}}` | Current time | 14:30:45 |
+| `{{datetime}}` | Date and time | 2026-02-05 14:30:45 |
+| `{{weekday}}` | Day name | Wednesday |
+| `{{clipboard}}` | Clipboard content | (pasted text) |
+| `{{year}}` | Current year | 2026 |
+| `{{month}}` | Current month | 02 |
+| `{{day}}` | Current day | 05 |
+
+## Configuration
+
+Snippets are stored in `%APPDATA%\swifttype\config.yml`:
+
+```yaml
+matches:
+  - trigger: ":hello"
+    replace: "Hello, World!"
+    label: "Greeting"
+    
+  - trigger: ":date"
+    replace: "{{date}}"
+    label: "Current Date"
+    
+  - trigger: ":sig"
+    replace: |
+      Best regards,
+      Your Name
+      your@email.com
+    label: "Email Signature"
+    
+  - regex: ":t(\\d+)"
+    replace: "Task #$1"
+    label: "Task Number"
+```
+
+## Development
+
+```powershell
+# Run in development mode
+npm run tauri dev
+
+# Build for production
+npm run tauri build
+```
+
+## Tech Stack
+
+- **Backend**: Rust with Tauri 2.x
+- **Frontend**: React 18 + TypeScript + Vite
+- **Styling**: Custom CSS with CSS variables
+- **Config**: serde_yaml for YAML parsing
+
+## License
+
+MIT License
+</file>
+
+<file path="repomix.config.json">
+{
+  "output": {
+    "filePath": "repomix-output.xml",
+    "style": "xml",
+    "fileSummary": true,
+    "directoryStructure": true,
+    "removeComments": false,
+    "removeEmptyLines": false,
+    "topFilesLength": 5,
+    "showLineNumbers": false
+  },
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      "src-tauri/target/**",
+      "dist/**",
+      ".vscode/**",
+      "package-lock.json",
+      "src-tauri/icons/**",
+      "src/assets/**",
+      "public/**"
+    ]
+  },
+  "security": {
+    "enableSecurityCheck": true
+  }
+}
+</file>
+
+<file path="scripts/sync-version.js">
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const packageJsonPath = path.join(__dirname, '../package.json');
+const tauriConfPath = path.join(__dirname, '../src-tauri/tauri.conf.json');
+const cargoTomlPath = path.join(__dirname, '../src-tauri/Cargo.toml');
+const changelogPath = path.join(__dirname, '../CHANGELOG.md');
+
+try {
+  // Read the new version from package.json
+  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+  const version = packageJson.version;
+
+  // Update tauri.conf.json
+  const tauriConf = JSON.parse(fs.readFileSync(tauriConfPath, 'utf8'));
+  tauriConf.version = version;
+  fs.writeFileSync(tauriConfPath, JSON.stringify(tauriConf, null, 2) + '\n');
+  console.log(`✅ Updated tauri.conf.json to version ${version}`);
+
+  // Update Cargo.toml
+  let cargoToml = fs.readFileSync(cargoTomlPath, 'utf8');
+  cargoToml = cargoToml.replace(/^version\s*=\s*".*?"/m, `version = "${version}"`);
+  fs.writeFileSync(cargoTomlPath, cargoToml);
+  console.log(`✅ Updated Cargo.toml to version ${version}`);
+
+  // Generate Changelog
+  let lastTag = '';
+  try {
+    lastTag = execSync('git describe --tags --abbrev=0', { encoding: 'utf8' }).trim();
+  } catch (e) {
+    // No tags yet
+  }
+
+  const date = new Date().toISOString().split('T')[0];
+  let newChangelogEntry = `## [${version}] - ${date}\n\n`;
+
+  try {
+    const gitLogCmd = lastTag 
+      ? `git log ${lastTag}..HEAD --pretty=format:"- %s"`
+      : `git log --pretty=format:"- %s"`;
+    const commits = execSync(gitLogCmd, { encoding: 'utf8' }).trim();
+    if (commits) {
+      newChangelogEntry += commits + '\n\n';
+    } else {
+      newChangelogEntry += '- No new commits.\n\n';
+    }
+  } catch (e) {
+    newChangelogEntry += '- Could not generate changelog from git commits.\n\n';
+  }
+
+  let existingChangelog = '';
+  if (fs.existsSync(changelogPath)) {
+    existingChangelog = fs.readFileSync(changelogPath, 'utf8');
+  } else {
+    existingChangelog = '# Changelog\n\nAll notable changes to this project will be documented in this file.\n\n';
+  }
+
+  // Prepend new entry after the main title
+  if (existingChangelog.startsWith('# Changelog')) {
+    existingChangelog = existingChangelog.replace(
+      /# Changelog\n*/,
+      `# Changelog\n\n${newChangelogEntry}`
+    );
+  } else {
+    existingChangelog = newChangelogEntry + existingChangelog;
+  }
+
+  fs.writeFileSync(changelogPath, existingChangelog);
+  console.log(`✅ Updated CHANGELOG.md for version ${version}`);
+
+  console.log(`\n🎉 Successfully synced version ${version} to all Tauri configuration files.`);
+} catch (error) {
+  console.error('❌ Failed to sync versions:', error);
+  process.exit(1);
+}
+</file>
+
+<file path="src-tauri/.gitignore">
+# Generated by Cargo
+# will have compiled files and executables
+/target/
+
+# Generated by Tauri
+# will have schema files for capabilities auto-completion
+/gen/schemas
+</file>
+
+<file path="src-tauri/build.rs">
+fn main() {
+    tauri_build::build()
+}
+</file>
+
+<file path="src-tauri/capabilities/default.json">
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capability for the main window",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "opener:default"
+  ]
+}
+</file>
+
+<file path="src-tauri/src/main.rs">
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+fn main() {
+    swifttype_lib::run()
+}
+</file>
+
 <file path="src/components/layout/Sidebar.tsx">
+import { useMemo } from "react";
 import { SidebarProps } from "../../types";
 
-export function Sidebar({ activeTab, setActiveTab, onNewSnippet }: SidebarProps) {
+export function Sidebar({ activeTab, setActiveTab, snippets, onNewSnippet }: SidebarProps) {
+  
+  const collections = useMemo(() => {
+    const cats = new Set(
+      snippets
+        .filter(s => !s.deleted_at)
+        .map(s => s.category || "General")
+    );
+    return Array.from(cats).sort();
+  }, [snippets]);
+
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
@@ -120,18 +569,43 @@ export function Sidebar({ activeTab, setActiveTab, onNewSnippet }: SidebarProps)
           <span className="material-symbols-outlined sidebar-icon">description</span>
           <span>All Snippets</span>
         </div>
-        <div className="nav-item">
+        <div 
+          className={`nav-item ${activeTab === "favorites" ? "active" : ""}`}
+          onClick={() => setActiveTab("favorites")}
+        >
           <span className="material-symbols-outlined sidebar-icon">star</span>
           <span>Favorites</span>
         </div>
-        <div className="nav-item">
+        
+        <div className="nav-item" style={{ pointerEvents: 'none', opacity: 0.7, marginTop: '0.5rem' }}>
           <span className="material-symbols-outlined sidebar-icon">folder</span>
-          <span>Collections</span>
+          <span style={{ fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Collections</span>
         </div>
+        
+        {collections.length === 0 && (
+           <div className="nav-item" style={{ paddingLeft: '2.5rem', opacity: 0.5, pointerEvents: 'none' }}>
+             <span style={{ fontSize: '0.85rem' }}>No collections yet</span>
+           </div>
+        )}
+        
+        {collections.map(col => (
+          <div 
+            key={col}
+            className={`nav-item ${activeTab === `collection:${col}` ? "active" : ""}`}
+            onClick={() => setActiveTab(`collection:${col}`)}
+            style={{ paddingLeft: '2.5rem' }}
+          >
+            <span className="material-symbols-outlined sidebar-icon" style={{ fontSize: '18px' }}>folder_open</span>
+            <span>{col}</span>
+          </div>
+        ))}
         
         <div className="sidebar-divider"></div>
         
-        <div className="nav-item">
+        <div 
+          className={`nav-item ${activeTab === "trash" ? "active" : ""}`}
+          onClick={() => setActiveTab("trash")}
+        >
           <span className="material-symbols-outlined sidebar-icon">delete</span>
           <span>Trash</span>
         </div>
@@ -154,12 +628,22 @@ import { Snippet, SnippetEditorProps } from "../../types";
 import { Button } from "../ui/Button";
 
 
-export function SnippetEditor({ snippet, onSave, onClose }: SnippetEditorProps) {
+export function SnippetEditor({ snippet, existingCategories, onSave, onClose }: SnippetEditorProps) {
   const [trigger, setTrigger] = useState(snippet?.trigger || "");
   const [replace, setReplace] = useState(snippet?.replace || "");
   const [label, setLabel] = useState(snippet?.label || "");
   const [useRegex, setUseRegex] = useState(!!snippet?.regex);
   const [regex, setRegex] = useState(snippet?.regex || "");
+  const [category, setCategory] = useState(snippet?.category || "");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [filterApp, setFilterApp] = useState(snippet?.filter_app || "");
+  const [shellCmd, setShellCmd] = useState(snippet?.shell || "");
+  const [imagePath, setImagePath] = useState(snippet?.image_path || "");
+  const [matchWord, setMatchWord] = useState(!!snippet?.word);
+
+  const insertVariable = (variable: string) => {
+    setReplace((prev) => prev + variable);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -169,12 +653,13 @@ export function SnippetEditor({ snippet, onSave, onClose }: SnippetEditorProps) 
       regex: useRegex ? regex : null,
       replace,
       label: label || null,
-      word: snippet?.word || false,
+      category: category || null,
+      word: matchWord,
       uppercase_style: snippet?.uppercase_style || null,
-      image_path: snippet?.image_path || null,
-      shell: snippet?.shell || null,
+      image_path: imagePath || null,
+      shell: shellCmd || null,
       form_fields: snippet?.form_fields || null,
-      filter_app: snippet?.filter_app || null,
+      filter_app: filterApp || null,
     };
     onSave(newSnippet);
   };
@@ -204,6 +689,21 @@ export function SnippetEditor({ snippet, onSave, onClose }: SnippetEditorProps) 
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
               />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Category</label>
+              <input
+                type="text"
+                list="category-suggestions"
+                className="form-input"
+                placeholder="e.g., Development, Communication"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              />
+              <datalist id="category-suggestions">
+                {existingCategories.map(cat => <option key={cat} value={cat} />)}
+              </datalist>
             </div>
 
             <div className="form-group">
@@ -239,9 +739,87 @@ export function SnippetEditor({ snippet, onSave, onClose }: SnippetEditorProps) 
                 onChange={(e) => setReplace(e.target.value)}
               />
               <p className="form-hint">
-                Variables: {"{{date}}"}, {"{{time}}"}, {"{{clipboard}}"}, {"{{weekday}}"}
+                Variables: 
+                <button type="button" onClick={() => insertVariable("{{date}}")} style={{ background: "none", border: "none", color: "var(--primary-color)", cursor: "pointer", padding: "0 4px" }}>{`{{date}}`}</button>,
+                <button type="button" onClick={() => insertVariable("{{time}}")} style={{ background: "none", border: "none", color: "var(--primary-color)", cursor: "pointer", padding: "0 4px" }}>{`{{time}}`}</button>,
+                <button type="button" onClick={() => insertVariable("{{clipboard}}")} style={{ background: "none", border: "none", color: "var(--primary-color)", cursor: "pointer", padding: "0 4px" }}>{`{{clipboard}}`}</button>,
+                <button type="button" onClick={() => insertVariable("{{weekday}}")} style={{ background: "none", border: "none", color: "var(--primary-color)", cursor: "pointer", padding: "0 4px" }}>{`{{weekday}}`}</button>
               </p>
             </div>
+
+            <div className="form-group" style={{ marginTop: "var(--space-lg)" }}>
+              <button 
+                type="button" 
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                style={{ display: "flex", alignItems: "center", gap: "8px", background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer", fontSize: "0.875rem", padding: 0 }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: "20px", transition: "transform 0.2s", transform: showAdvanced ? "rotate(90deg)" : "rotate(0deg)" }}>
+                  chevron_right
+                </span>
+                {showAdvanced ? "Hide Advanced Options" : "Show Advanced Options"}
+              </button>
+            </div>
+
+            {showAdvanced && (
+              <div style={{ paddingLeft: "28px", display: "flex", flexDirection: "column", gap: "var(--space-md)", borderLeft: "2px solid var(--border-color)", marginLeft: "10px", marginTop: "var(--space-md)" }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="checkbox-label" style={{ color: "var(--text-primary)" }}>
+                    <input
+                      type="checkbox"
+                      checked={matchWord}
+                      onChange={(e) => setMatchWord(e.target.checked)}
+                    />
+                    Match Whole Word Only
+                  </label>
+                  <p className="form-hint" style={{ marginLeft: "24px" }}>
+                    Trigger will only fire if surrounded by spaces or punctuation.
+                  </p>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Filter by Application</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g., Code.exe, chrome.exe"
+                    value={filterApp}
+                    onChange={(e) => setFilterApp(e.target.value)}
+                  />
+                  <p className="form-hint">
+                    Only expand this snippet when the specified app is in the foreground.
+                  </p>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Run Shell Command</label>
+                  <input
+                    type="text"
+                    className="form-input font-mono"
+                    placeholder="e.g., echo 'Hello'"
+                    value={shellCmd}
+                    onChange={(e) => setShellCmd(e.target.value)}
+                  />
+                  <p className="form-hint">
+                    Execute a system command after expanding the snippet.
+                  </p>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Image Path</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="C:\path\to\image.png"
+                    value={imagePath}
+                    onChange={(e) => setImagePath(e.target.value)}
+                  />
+                  <p className="form-hint">
+                    Optionally paste an image alongside the text.
+                  </p>
+                </div>
+              </div>
+            )}
+
           <div className="form-actions">
             <Button type="button" variant="secondary" onClick={onClose}>
               Cancel
@@ -314,6 +892,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { AppSettings, SettingsViewProps } from "../../types";
 import { Button } from "../ui/Button";
 import { Toggle } from "../ui/Toggle";
+import { save, open } from "@tauri-apps/plugin-dialog";
 
 export function SettingsView({ settings, onSave }: SettingsViewProps) {
   const [localSettings, setLocalSettings] = useState<AppSettings | null>(settings);
@@ -333,6 +912,40 @@ export function SettingsView({ settings, onSave }: SettingsViewProps) {
     } catch (err) {
       console.error("Failed to save settings:", err);
       setLocalSettings(localSettings); // Revert on failure
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      const filePath = await save({
+        filters: [{ name: 'SwiftType Backup', extensions: ['yml', 'yaml'] }],
+        defaultPath: 'swifttype_backup.yml',
+      });
+      if (filePath) {
+        await invoke("export_snippets", { path: filePath });
+        alert("Snippets exported successfully!");
+      }
+    } catch (err) {
+      console.error("Export failed:", err);
+      alert("Failed to export snippets.");
+    }
+  };
+
+  const handleImport = async () => {
+    try {
+      const filePath = await open({
+        filters: [{ name: 'SwiftType Backup', extensions: ['yml', 'yaml'] }],
+        multiple: false,
+      });
+      if (filePath) {
+        const merge = window.confirm("Do you want to MERGE these snippets with your existing ones?\n\n(Click 'OK' to MERGE, click 'Cancel' to OVERWRITE)");
+        await invoke("import_snippets", { path: filePath, merge });
+        onSave(); // trigger data reload
+        alert("Snippets imported successfully!");
+      }
+    } catch (err) {
+      console.error("Import failed:", err);
+      alert("Failed to import snippets.");
     }
   };
 
@@ -475,41 +1088,31 @@ export function SettingsView({ settings, onSave }: SettingsViewProps) {
                 <h3 className="settings-card-title">Data Management</h3>
               </div>
               <p className="settings-card-desc">
-                Manage your snippet database, sync with the cloud, or create local backups.
+                Create local backups and restore your snippets.
               </p>
 
               <div className="action-cards-grid">
                 <div className="action-card">
                   <div className="action-card-header">
-                    <span className="material-symbols-outlined">cloud_sync</span>
-                    <h4>Cloud Sync</h4>
+                    <span className="material-symbols-outlined">download</span>
+                    <h4>Export Backup</h4>
                   </div>
-                  <p>Last synced: Today at 10:42 AM.</p>
-                  <Button variant="secondary" className="action-btn-full" onClick={() => {}}>
-                    Sync Now
+                  <p>Download all snippets as a YAML file.</p>
+                  <Button variant="secondary" className="action-btn-outline" onClick={handleExport}>
+                    Export Backup...
                   </Button>
                 </div>
-                
+
                 <div className="action-card">
                   <div className="action-card-header">
-                    <span className="material-symbols-outlined">download</span>
-                    <h4>Export Data</h4>
+                    <span className="material-symbols-outlined">upload</span>
+                    <h4>Restore Backup</h4>
                   </div>
-                  <p>Download all snippets as a JSON file.</p>
-                  <Button variant="secondary" className="action-btn-outline" onClick={() => {}}>
-                    Export to JSON
+                  <p>Import snippets from a YAML backup.</p>
+                  <Button variant="secondary" className="action-btn-danger" onClick={handleImport}>
+                    Restore Backup...
                   </Button>
                 </div>
-              </div>
-
-              <div className="settings-row settings-row-bordered pt-md">
-                <div className="settings-row-info">
-                  <h4>Restore Backup</h4>
-                  <p>Overwrite current data from a backup file.</p>
-                </div>
-                <Button variant="secondary" className="action-btn-danger" onClick={() => {}}>
-                  Restore...
-                </Button>
               </div>
             </div>
 
@@ -547,12 +1150,51 @@ export function SettingsView({ settings, onSave }: SettingsViewProps) {
 </file>
 
 <file path="src/components/views/SnippetsView.tsx">
+import { useState, useMemo } from "react";
 import { SnippetsViewProps } from "../../types";
-import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
 
-export function SnippetsView({ snippets, onEdit }: SnippetsViewProps) {
-  
+export function SnippetsView({ activeTab, snippets, onEdit, onDelete, onUpdate }: SnippetsViewProps) {
+  const [sortBy, setSortBy] = useState<"name-asc" | "name-desc" | "usage-desc" | "updated-desc">("updated-desc");
+  const [filterCategory, setFilterCategory] = useState<string>("All");
+
+  const categories = useMemo(() => {
+    const cats = new Set(snippets.filter(s => !s.deleted_at).map(s => s.category || "General"));
+    return ["All", ...Array.from(cats).sort()];
+  }, [snippets]);
+
+  const filteredAndSortedSnippets = useMemo(() => {
+    let filtered = snippets.filter(s => {
+      if (activeTab === "trash") return !!s.deleted_at;
+      if (activeTab === "favorites") return s.is_favorite && !s.deleted_at;
+      if (activeTab.startsWith("collection:")) {
+        const col = activeTab.split(":")[1];
+        const snippetCat = s.category || "General";
+        return snippetCat === col && !s.deleted_at;
+      }
+      return !s.deleted_at;
+    });
+
+    if (filterCategory !== "All") {
+      filtered = filtered.filter(s => (s.category || "General") === filterCategory);
+    }
+
+    return filtered.sort((a, b) => {
+      switch (sortBy) {
+        case "name-asc":
+          return (a.label || a.id).localeCompare(b.label || b.id);
+        case "name-desc":
+          return (b.label || b.id).localeCompare(a.label || a.id);
+        case "usage-desc":
+          return (b.usage_count || 0) - (a.usage_count || 0);
+        case "updated-desc":
+          return (b.updated_at || 0) - (a.updated_at || 0);
+        default:
+          return 0;
+      }
+    });
+  }, [snippets, activeTab, filterCategory, sortBy]);
+
   const getCategoryClass = (category?: string | null) => {
     switch (category?.toLowerCase()) {
       case 'communication': return 'category-communication';
@@ -570,30 +1212,58 @@ export function SnippetsView({ snippets, onEdit }: SnippetsViewProps) {
     return `${Math.floor(seconds / 86400)}d ago`;
   };
 
+  let title = "All Snippets";
+  let description = "Manage and organize your reusable text blocks.";
+  if (activeTab === "favorites") {
+    title = "Favorites";
+    description = "Your starred and most important snippets.";
+  } else if (activeTab === "trash") {
+    title = "Trash";
+    description = "Deleted snippets. They will be permanently removed eventually.";
+  } else if (activeTab.startsWith("collection:")) {
+    title = activeTab.split(":")[1];
+    description = `Snippets in the ${title} collection.`;
+  }
+
+  // Hide the category filter if we are inside a collection
+  const showCategoryFilter = !activeTab.startsWith("collection:");
+
   return (
     <>
       <div className="content-area content-area-padded">
         <div className="view-header">
           <div>
-            <h2 className="header-title">All Snippets</h2>
-            <p className="view-description">
-              Manage and organize your reusable text blocks.
-            </p>
+            <h2 className="header-title">{title}</h2>
+            <p className="view-description">{description}</p>
           </div>
-          <div className="view-actions">
-            <Button variant="secondary" icon={<span className="material-symbols-outlined icon-sm">filter_list</span>}>
-              Filter
-            </Button>
-            <Button variant="secondary" icon={<span className="material-symbols-outlined icon-sm">sort</span>}>
-              Sort
-            </Button>
+          <div className="view-actions" style={{ display: 'flex', gap: '8px' }}>
+            {showCategoryFilter && (
+              <select 
+                value={filterCategory} 
+                onChange={e => setFilterCategory(e.target.value)}
+                className="form-input"
+                style={{ width: 'auto', minWidth: '120px', padding: '4px 8px', fontSize: '13px', height: '32px' }}
+              >
+                {categories.map(cat => <option key={cat} value={cat}>{cat === "All" ? "All Categories" : cat}</option>)}
+              </select>
+            )}
+            <select 
+              value={sortBy} 
+              onChange={e => setSortBy(e.target.value as any)}
+              className="form-input"
+              style={{ width: 'auto', minWidth: '120px', padding: '4px 8px', fontSize: '13px', height: '32px' }}
+            >
+              <option value="updated-desc">Recently Updated</option>
+              <option value="usage-desc">Most Used</option>
+              <option value="name-asc">Name (A-Z)</option>
+              <option value="name-desc">Name (Z-A)</option>
+            </select>
           </div>
         </div>
 
-        {/* Snippets Grid */}
-        {snippets.length > 0 ? (
+        {filteredAndSortedSnippets.length > 0 ? (
           <div className="snippet-grid snippet-grid-mt">
-            {snippets.map((snippet) => (
+            {filteredAndSortedSnippets.map((snippet) => (
               <div
                 key={snippet.id}
                 className="snippet-card"
@@ -606,20 +1276,41 @@ export function SnippetsView({ snippets, onEdit }: SnippetsViewProps) {
                     {snippet.label || snippet.id}
                   </h3>
                   <div className="snippet-card-actions">
-                    <IconButton
-                      icon={<span className="material-symbols-outlined icon-sm">star</span>}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        // Favorite toggle logic can be added here
-                      }}
-                    />
-                    <IconButton
-                      icon={<span className="material-symbols-outlined icon-sm">content_copy</span>}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigator.clipboard.writeText(snippet.replace);
-                      }}
-                    />
+                    {activeTab === "trash" ? (
+                      <>
+                        <IconButton
+                          icon={<span className="material-symbols-outlined icon-sm">restore</span>}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onUpdate(snippet.id, { ...snippet, deleted_at: null });
+                          }}
+                        />
+                        <IconButton
+                          icon={<span className="material-symbols-outlined icon-sm">delete_forever</span>}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(snippet.id);
+                          }}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <IconButton
+                          icon={<span className="material-symbols-outlined icon-sm" style={{ color: snippet.is_favorite ? '#eab308' : 'inherit' }}>{snippet.is_favorite ? 'star' : 'star_border'}</span>}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onUpdate(snippet.id, { ...snippet, is_favorite: !snippet.is_favorite });
+                          }}
+                        />
+                        <IconButton
+                          icon={<span className="material-symbols-outlined icon-sm">delete</span>}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(snippet.id);
+                          }}
+                        />
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -649,9 +1340,13 @@ export function SnippetsView({ snippets, onEdit }: SnippetsViewProps) {
             <div className="empty-state-icon">
               <span className="material-symbols-outlined icon-lg">dataset</span>
             </div>
-            <h3 className="empty-state-title">No snippets yet</h3>
+            <h3 className="empty-state-title">No snippets found</h3>
             <p className="empty-state-text">
-              Create your first snippet to start expanding text automatically
+              {activeTab === "trash" 
+                ? "Your trash is empty." 
+                : activeTab === "favorites" 
+                  ? "You haven't starred any snippets yet."
+                  : "Create your first snippet to get started."}
             </p>
           </div>
         )}
@@ -659,6 +1354,18 @@ export function SnippetsView({ snippets, onEdit }: SnippetsViewProps) {
     </>
   );
 }
+</file>
+
+<file path="src/main.tsx">
+import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App";
+
+ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);
 </file>
 
 <file path="src/styles/base.css">
@@ -1736,6 +2443,8 @@ export interface Snippet {
   category?: string | null;
   usage_count?: number | null;
   updated_at?: number | null;
+  is_favorite?: boolean | null;
+  deleted_at?: number | null;
 }
 
 export interface FormField {
@@ -1763,13 +2472,16 @@ export interface EngineStatus {
 }
 
 export interface SnippetsViewProps {
+  activeTab: string;
   snippets: Snippet[];
   onEdit: (snippet: Snippet) => void;
   onDelete: (id: string) => void;
+  onUpdate: (id: string, snippet: Snippet) => void;
 }
 
 export interface SnippetEditorProps {
   snippet: Snippet | null;
+  existingCategories: string[];
   onSave: (snippet: Snippet) => void;
   onClose: () => void;
 }
@@ -1780,442 +2492,11 @@ export interface SettingsViewProps {
 }
 
 export interface SidebarProps {
-  activeTab: "snippets" | "settings" | "editor";
-  setActiveTab: (tab: "snippets" | "settings" | "editor") => void;
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+  snippets: Snippet[];
   onNewSnippet: () => void;
 }
-</file>
-
-<file path=".github/workflows/release.yaml">
-name: Release
-
-on:
-  push:
-    tags:
-      - 'v*'
-
-# Workflow-level permissions — required for GITHUB_TOKEN to create releases.
-# Also verify Settings → Actions → General → Workflow permissions is "Read and write".
-permissions:
-  contents: write
-
-# Prevent duplicate releases if tags are pushed in quick succession
-concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: true
-
-jobs:
-  publish-tauri:
-    runs-on: windows-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install frontend dependencies
-        run: npm ci
-
-      # Determine bundle targets and release flags from the tag.
-      # MSI (WiX) only supports X.Y.Z versions — pre-release tags like
-      # "alpha.0" are invalid. Skip MSI for pre-release builds.
-      - name: Determine release parameters
-        id: params
-        shell: pwsh
-        run: |
-          $tag = "${{ github.ref_name }}" -replace '^v', ''
-          if ($tag -match '-') {
-            # Pre-release tag (e.g. 1.4.2-alpha.0) — NSIS only, mark as prerelease
-            "bundles=nsis" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-            "prerelease=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          } else {
-            # Stable tag (e.g. 1.4.2) — both NSIS and MSI
-            "bundles=nsis,msi" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-            "prerelease=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          }
-
-      - name: Extract changelog for this version
-        id: changelog
-        shell: pwsh
-        run: |
-          $tag = "${{ github.ref_name }}" -replace '^v', ''
-          $body = "See the assets below to download and install this version."
-          if (Test-Path CHANGELOG.md) {
-            $content = Get-Content CHANGELOG.md -Raw
-            if ($content -match "(?ms)## \[$tag\].*?\n(.*?)(?=\n## \[|$)") {
-              $extracted = $Matches[1].Trim()
-              if ($extracted) { $body = $extracted }
-            }
-          }
-          "body<<CHANGELOG_EOF" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          $body | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          "CHANGELOG_EOF" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-
-      # tauri-action runs `beforeBuildCommand` (npm run build) internally before
-      # invoking cargo. No need to build separately — that just doubles the time.
-      - name: Build and release Tauri app
-        uses: tauri-apps/tauri-action@v0.5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: SwiftType ${{ github.ref_name }}
-          releaseBody: |
-            ## What's New in ${{ github.ref_name }}
-
-            ${{ steps.changelog.outputs.body }}
-
-            ### Installation
-            - **EXE installer (recommended):** Download the `_x64-setup.exe` file
-            - **MSI installer:** Download the `_x64_en-US.msi` file
-          releaseDraft: false
-          prerelease: ${{ steps.params.outputs.prerelease == 'true' }}
-          tauriScript: npx tauri
-          args: --bundles ${{ steps.params.outputs.bundles }}
-
-      # If the release step fails after build succeeds, preserve artifacts
-      - name: Upload build artifacts (fallback)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-artifacts-${{ github.ref_name }}
-          path: |
-            src-tauri/target/release/bundle/msi/*.msi
-            src-tauri/target/release/bundle/nsis/*-setup.exe
-          retention-days: 7
-</file>
-
-<file path=".gitignore">
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-</file>
-
-<file path="CHANGELOG.md">
-# Changelog
-
-## [0.1.1-alpha.0] - 2026-07-10
-
-- ci: add github release workflow
-- chore: setup automated versioning and changelog generation
-- Phase 5: Code Cleanup & Final Testing
-- Phase 4: System Tray Integration
-- Phase 3: Non-Destructive Clipboard Handling
-- Phase 2: Native Internationalization & Layout Support
-- Phase 1: Asynchronous Keyboard Hook Architecture
-- chore: setup repomix and configuration
-- initial commit
-
-All notable changes to this project will be documented in this file.
-</file>
-
-<file path="README.md">
-# SwiftType ⚡
-
-A modern, lightweight text expander for Windows. Alternative to Espanso with a beautiful UI.
-
-![Dark Theme](https://img.shields.io/badge/theme-dark-1a1a20)
-![Rust Backend](https://img.shields.io/badge/backend-Rust-orange)
-![React Frontend](https://img.shields.io/badge/frontend-React-61dafb)
-
-## Features
-
-- **🚀 Fast & Lightweight** - Built with Rust and Tauri
-- **✨ Modern UI** - Dark theme with glassmorphism effects
-- **⌨️ Global Hotkeys** - Works in any application
-- **📝 YAML Config** - Espanso-compatible format
-- **🔄 Variable Expansion** - Date, time, clipboard, and more
-- **🎯 Regex Triggers** - Advanced pattern matching
-
-## Installation
-
-### Prerequisites
-
-- [Rust](https://rustup.rs/) 1.70+
-- [Node.js](https://nodejs.org/) 18+
-- [VS Build Tools 2022](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022) with C++ workload
-
-### Build from Source
-
-```powershell
-git clone https://github.com/yourusername/SwiftType.git
-cd SwiftType
-npm install
-npm run tauri dev
-```
-
-## Usage
-
-### Creating Snippets
-
-1. Open SwiftType
-2. Click **New Snippet**
-3. Set a trigger (e.g., `:hello`)
-4. Set the replacement text
-5. Click **Create Snippet**
-
-### Typing Triggers
-
-Type your trigger in any application and it will automatically expand!
-
-```
-:hello → Hello, World!
-:date  → 2026-02-05
-:sig   → Your signature text
-```
-
-### Supported Variables
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `{{date}}` | Current date | 2026-02-05 |
-| `{{time}}` | Current time | 14:30:45 |
-| `{{datetime}}` | Date and time | 2026-02-05 14:30:45 |
-| `{{weekday}}` | Day name | Wednesday |
-| `{{clipboard}}` | Clipboard content | (pasted text) |
-| `{{year}}` | Current year | 2026 |
-| `{{month}}` | Current month | 02 |
-| `{{day}}` | Current day | 05 |
-
-## Configuration
-
-Snippets are stored in `%APPDATA%\swifttype\config.yml`:
-
-```yaml
-matches:
-  - trigger: ":hello"
-    replace: "Hello, World!"
-    label: "Greeting"
-    
-  - trigger: ":date"
-    replace: "{{date}}"
-    label: "Current Date"
-    
-  - trigger: ":sig"
-    replace: |
-      Best regards,
-      Your Name
-      your@email.com
-    label: "Email Signature"
-    
-  - regex: ":t(\\d+)"
-    replace: "Task #$1"
-    label: "Task Number"
-```
-
-## Development
-
-```powershell
-# Run in development mode
-npm run tauri dev
-
-# Build for production
-npm run tauri build
-```
-
-## Tech Stack
-
-- **Backend**: Rust with Tauri 2.x
-- **Frontend**: React 18 + TypeScript + Vite
-- **Styling**: Custom CSS with CSS variables
-- **Config**: serde_yaml for YAML parsing
-
-## License
-
-MIT License
-</file>
-
-<file path="repomix.config.json">
-{
-  "output": {
-    "filePath": "repomix-output.xml",
-    "style": "xml",
-    "fileSummary": true,
-    "directoryStructure": true,
-    "removeComments": false,
-    "removeEmptyLines": false,
-    "topFilesLength": 5,
-    "showLineNumbers": false
-  },
-  "ignore": {
-    "useGitignore": true,
-    "useDefaultPatterns": true,
-    "customPatterns": [
-      "src-tauri/target/**",
-      "dist/**",
-      ".vscode/**",
-      "package-lock.json",
-      "src-tauri/icons/**",
-      "src/assets/**",
-      "public/**"
-    ]
-  },
-  "security": {
-    "enableSecurityCheck": true
-  }
-}
-</file>
-
-<file path="scripts/sync-version.js">
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { execSync } from 'child_process';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const packageJsonPath = path.join(__dirname, '../package.json');
-const tauriConfPath = path.join(__dirname, '../src-tauri/tauri.conf.json');
-const cargoTomlPath = path.join(__dirname, '../src-tauri/Cargo.toml');
-const changelogPath = path.join(__dirname, '../CHANGELOG.md');
-
-try {
-  // Read the new version from package.json
-  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-  const version = packageJson.version;
-
-  // Update tauri.conf.json
-  const tauriConf = JSON.parse(fs.readFileSync(tauriConfPath, 'utf8'));
-  tauriConf.version = version;
-  fs.writeFileSync(tauriConfPath, JSON.stringify(tauriConf, null, 2) + '\n');
-  console.log(`✅ Updated tauri.conf.json to version ${version}`);
-
-  // Update Cargo.toml
-  let cargoToml = fs.readFileSync(cargoTomlPath, 'utf8');
-  cargoToml = cargoToml.replace(/^version\s*=\s*".*?"/m, `version = "${version}"`);
-  fs.writeFileSync(cargoTomlPath, cargoToml);
-  console.log(`✅ Updated Cargo.toml to version ${version}`);
-
-  // Generate Changelog
-  let lastTag = '';
-  try {
-    lastTag = execSync('git describe --tags --abbrev=0', { encoding: 'utf8' }).trim();
-  } catch (e) {
-    // No tags yet
-  }
-
-  const date = new Date().toISOString().split('T')[0];
-  let newChangelogEntry = `## [${version}] - ${date}\n\n`;
-
-  try {
-    const gitLogCmd = lastTag 
-      ? `git log ${lastTag}..HEAD --pretty=format:"- %s"`
-      : `git log --pretty=format:"- %s"`;
-    const commits = execSync(gitLogCmd, { encoding: 'utf8' }).trim();
-    if (commits) {
-      newChangelogEntry += commits + '\n\n';
-    } else {
-      newChangelogEntry += '- No new commits.\n\n';
-    }
-  } catch (e) {
-    newChangelogEntry += '- Could not generate changelog from git commits.\n\n';
-  }
-
-  let existingChangelog = '';
-  if (fs.existsSync(changelogPath)) {
-    existingChangelog = fs.readFileSync(changelogPath, 'utf8');
-  } else {
-    existingChangelog = '# Changelog\n\nAll notable changes to this project will be documented in this file.\n\n';
-  }
-
-  // Prepend new entry after the main title
-  if (existingChangelog.startsWith('# Changelog')) {
-    existingChangelog = existingChangelog.replace(
-      /# Changelog\n*/,
-      `# Changelog\n\n${newChangelogEntry}`
-    );
-  } else {
-    existingChangelog = newChangelogEntry + existingChangelog;
-  }
-
-  fs.writeFileSync(changelogPath, existingChangelog);
-  console.log(`✅ Updated CHANGELOG.md for version ${version}`);
-
-  console.log(`\n🎉 Successfully synced version ${version} to all Tauri configuration files.`);
-} catch (error) {
-  console.error('❌ Failed to sync versions:', error);
-  process.exit(1);
-}
-</file>
-
-<file path="src-tauri/.gitignore">
-# Generated by Cargo
-# will have compiled files and executables
-/target/
-
-# Generated by Tauri
-# will have schema files for capabilities auto-completion
-/gen/schemas
-</file>
-
-<file path="src-tauri/build.rs">
-fn main() {
-    tauri_build::build()
-}
-</file>
-
-<file path="src-tauri/capabilities/default.json">
-{
-  "$schema": "../gen/schemas/desktop-schema.json",
-  "identifier": "default",
-  "description": "Capability for the main window",
-  "windows": ["main"],
-  "permissions": [
-    "core:default",
-    "opener:default"
-  ]
-}
-</file>
-
-<file path="src-tauri/src/main.rs">
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-
-fn main() {
-    swifttype_lib::run()
-}
-</file>
-
-<file path="src/main.tsx">
-import React from "react";
-import ReactDOM from "react-dom/client";
-import App from "./App";
-
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-);
 </file>
 
 <file path="src/vite-env.d.ts">
@@ -2298,27 +2579,6 @@ export default defineConfig(async () => ({
 }));
 </file>
 
-<file path="index.html">
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&family=Inter:wght@400;500;600&family=Geist:wght@400;500&display=swap" rel="stylesheet">
-    <title>SwiftType</title>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
-  </head>
-
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
-</file>
-
 <file path="src-tauri/Cargo.toml">
 [package]
 name = "swifttype"
@@ -2348,6 +2608,7 @@ parking_lot = "0.12"
 log = "0.4"
 env_logger = "0.11"
 dirs = "5"
+tauri-plugin-dialog = "2"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = [
@@ -2360,372 +2621,13 @@ windows = { version = "0.58", features = [
     "Win32_System_Memory",
 ] }
 
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-autostart = "2"
+
 [profile.release]
 lto = true
 opt-level = "z"
 strip = true
-</file>
-
-<file path="src-tauri/src/config.rs">
-//! Configuration Module
-//! 
-//! Handles loading, saving, and managing snippets configuration.
-
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::path::PathBuf;
-
-/// A single snippet/match definition
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Snippet {
-    /// Unique identifier for this snippet
-    #[serde(default = "generate_id")]
-    pub id: String,
-    
-    /// The trigger text (e.g., ":hello")
-    #[serde(alias = "trigger")]
-    pub trigger: Option<String>,
-    
-    /// Regex trigger pattern (alternative to exact trigger)
-    #[serde(alias = "regex")]
-    pub regex: Option<String>,
-    
-    /// The replacement text
-    pub replace: String,
-    
-    /// Optional label for display in UI
-    #[serde(default)]
-    pub label: Option<String>,
-    
-    /// Word-based trigger (requires word boundary)
-    #[serde(default)]
-    pub word: bool,
-    
-    /// Force uppercase matching
-    #[serde(default)]
-    pub uppercase_style: Option<String>,
-    
-    /// Image path for image expansion
-    #[serde(default)]
-    pub image_path: Option<String>,
-    
-    /// Shell command to execute
-    #[serde(default)]
-    pub shell: Option<String>,
-    
-    /// Form fields for dynamic input
-    #[serde(default)]
-    pub form_fields: Option<Vec<FormField>>,
-    
-    /// App-specific filter
-    #[serde(default)]
-    pub filter_app: Option<String>,
-    
-    /// Category for organization
-    #[serde(default)]
-    pub category: Option<String>,
-    
-    /// Usage count for tracking popularity
-    #[serde(default)]
-    pub usage_count: Option<u32>,
-    
-    /// Last updated timestamp
-    #[serde(default)]
-    pub updated_at: Option<u64>,
-}
-
-/// Form field definition for dynamic snippets
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FormField {
-    pub name: String,
-    pub label: Option<String>,
-    #[serde(default)]
-    pub default: String,
-    #[serde(rename = "type", default = "default_field_type")]
-    pub field_type: String,
-    #[serde(default)]
-    pub choices: Option<Vec<String>>,
-}
-
-fn default_field_type() -> String {
-    "text".to_string()
-}
-
-fn generate_id() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-    format!("snip_{}", timestamp)
-}
-
-/// Configuration file structure
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct Config {
-    /// List of snippets/matches
-    #[serde(default)]
-    pub matches: Vec<Snippet>,
-    
-    /// Global variables
-    #[serde(default)]
-    pub global_vars: HashMap<String, String>,
-}
-
-/// Application settings (stored separately from snippets)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AppSettings {
-    /// Enable/disable the expander
-    pub enabled: bool,
-    
-    /// Injection method preference
-    pub injection_method: String, // "auto", "keystrokes", "clipboard"
-    
-    /// Search bar hotkey
-    pub search_hotkey: String,
-    
-    /// Backspace undo duration (ms)
-    pub undo_backspace_ms: u32,
-    
-    /// Start with Windows
-    pub start_with_windows: bool,
-    
-    /// Show in system tray
-    pub show_in_tray: bool,
-    
-    /// Theme preference
-    pub theme: String, // "dark", "light", "system"
-    
-    /// Toggle hotkey
-    pub toggle_hotkey: Option<String>,
-}
-
-impl Default for AppSettings {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            injection_method: "auto".to_string(),
-            search_hotkey: "Alt+Space".to_string(),
-            undo_backspace_ms: 500,
-            start_with_windows: false,
-            show_in_tray: true,
-            theme: "dark".to_string(),
-            toggle_hotkey: None,
-        }
-    }
-}
-
-/// Configuration manager
-pub struct ConfigManager {
-    config: Config,
-    settings: AppSettings,
-    config_dir: PathBuf,
-}
-
-impl ConfigManager {
-    /// Create a new config manager
-    pub fn new() -> Result<Self, String> {
-        let config_dir = get_config_dir()?;
-        
-        // Ensure config directory exists
-        std::fs::create_dir_all(&config_dir)
-            .map_err(|e| format!("Failed to create config directory: {}", e))?;
-        
-        let mut manager = Self {
-            config: Config::default(),
-            settings: AppSettings::default(),
-            config_dir,
-        };
-        
-        // Load existing config if available
-        manager.load()?;
-        
-        Ok(manager)
-    }
-    
-    /// Get the config directory path
-    #[allow(dead_code)]
-    pub fn config_dir(&self) -> &PathBuf {
-        &self.config_dir
-    }
-    
-    /// Load configuration from disk
-    pub fn load(&mut self) -> Result<(), String> {
-        // Load snippets config
-        let config_path = self.config_dir.join("config.yml");
-        if config_path.exists() {
-            let content = std::fs::read_to_string(&config_path)
-                .map_err(|e| format!("Failed to read config file: {}", e))?;
-            self.config = serde_yaml::from_str(&content)
-                .map_err(|e| format!("Failed to parse config file: {}", e))?;
-        } else {
-            // Create default config
-            self.config = create_default_config();
-            self.save_config()?;
-        }
-        
-        // Load settings
-        let settings_path = self.config_dir.join("settings.json");
-        if settings_path.exists() {
-            let content = std::fs::read_to_string(&settings_path)
-                .map_err(|e| format!("Failed to read settings file: {}", e))?;
-            self.settings = serde_json::from_str(&content)
-                .map_err(|e| format!("Failed to parse settings file: {}", e))?;
-        } else {
-            self.save_settings()?;
-        }
-        
-        log::info!("Loaded {} snippets", self.config.matches.len());
-        Ok(())
-    }
-    
-    /// Save snippets config to disk
-    pub fn save_config(&self) -> Result<(), String> {
-        let config_path = self.config_dir.join("config.yml");
-        let content = serde_yaml::to_string(&self.config)
-            .map_err(|e| format!("Failed to serialize config: {}", e))?;
-        std::fs::write(&config_path, content)
-            .map_err(|e| format!("Failed to write config file: {}", e))?;
-        Ok(())
-    }
-    
-    /// Save settings to disk
-    pub fn save_settings(&self) -> Result<(), String> {
-        let settings_path = self.config_dir.join("settings.json");
-        let content = serde_json::to_string_pretty(&self.settings)
-            .map_err(|e| format!("Failed to serialize settings: {}", e))?;
-        std::fs::write(&settings_path, content)
-            .map_err(|e| format!("Failed to write settings file: {}", e))?;
-        Ok(())
-    }
-    
-    /// Get all snippets
-    pub fn snippets(&self) -> &[Snippet] {
-        &self.config.matches
-    }
-    
-    /// Get snippets as mutable
-    #[allow(dead_code)]
-    pub fn snippets_mut(&mut self) -> &mut Vec<Snippet> {
-        &mut self.config.matches
-    }
-    
-    /// Get settings
-    pub fn settings(&self) -> &AppSettings {
-        &self.settings
-    }
-    
-    /// Get settings as mutable
-    pub fn settings_mut(&mut self) -> &mut AppSettings {
-        &mut self.settings
-    }
-    
-    /// Add a new snippet
-    pub fn add_snippet(&mut self, snippet: Snippet) {
-        self.config.matches.push(snippet);
-    }
-    
-    /// Remove a snippet by ID
-    pub fn remove_snippet(&mut self, id: &str) -> bool {
-        if let Some(pos) = self.config.matches.iter().position(|s| s.id == id) {
-            self.config.matches.remove(pos);
-            true
-        } else {
-            false
-        }
-    }
-    
-    /// Update a snippet by ID
-    pub fn update_snippet(&mut self, id: &str, snippet: Snippet) -> bool {
-        if let Some(existing) = self.config.matches.iter_mut().find(|s| s.id == id) {
-            *existing = snippet;
-            true
-        } else {
-            false
-        }
-    }
-    
-    /// Find a snippet that matches the given buffer
-    #[allow(dead_code)]
-    pub fn find_matching_snippet(&self, buffer: &str) -> Option<&Snippet> {
-        for snippet in &self.config.matches {
-            if let Some(ref trigger) = snippet.trigger {
-                if buffer.ends_with(trigger) {
-                    return Some(snippet);
-                }
-            }
-            // TODO: Add regex matching
-        }
-        None
-    }
-}
-
-/// Get the configuration directory path
-fn get_config_dir() -> Result<PathBuf, String> {
-    let base = dirs::config_dir()
-        .or_else(|| dirs::home_dir().map(|h| h.join(".config")))
-        .ok_or_else(|| "Could not determine config directory".to_string())?;
-    Ok(base.join("swifttype"))
-}
-
-/// Create default configuration with example snippets
-fn create_default_config() -> Config {
-    Config {
-        matches: vec![
-            Snippet {
-                id: "example_hello".to_string(),
-                trigger: Some(":hello".to_string()),
-                regex: None,
-                replace: "Hello, World!".to_string(),
-                label: Some("Hello World".to_string()),
-                word: false,
-                uppercase_style: None,
-                image_path: None,
-                shell: None,
-                form_fields: None,
-                filter_app: None,
-                category: Some("General".to_string()),
-                usage_count: Some(42),
-                updated_at: Some(1715424000), // Arbitrary past timestamp
-            },
-            Snippet {
-                id: "example_date".to_string(),
-                trigger: Some(":date".to_string()),
-                regex: None,
-                replace: "{{date}}".to_string(),
-                label: Some("Current Date".to_string()),
-                word: false,
-                uppercase_style: None,
-                image_path: None,
-                shell: None,
-                form_fields: None,
-                filter_app: None,
-                category: Some("Development".to_string()),
-                usage_count: Some(15),
-                updated_at: Some(1715424000),
-            },
-            Snippet {
-                id: "example_email".to_string(),
-                trigger: Some(":email".to_string()),
-                regex: None,
-                replace: "example@email.com".to_string(),
-                label: Some("Email Address".to_string()),
-                word: false,
-                uppercase_style: None,
-                image_path: None,
-                shell: None,
-                form_fields: None,
-                filter_app: None,
-                category: Some("Communication".to_string()),
-                usage_count: Some(89),
-                updated_at: Some(1715424000),
-            },
-        ],
-        global_vars: HashMap::new(),
-    }
-}
-
-// Add dirs crate dependency - this will be added to Cargo.toml
 </file>
 
 <file path="src-tauri/tauri.conf.json">
@@ -2776,6 +2678,991 @@ fn create_default_config() -> Config {
 }
 </file>
 
+<file path="index.html">
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&family=Inter:wght@400;500;600&family=Geist:wght@400;500&display=swap" rel="stylesheet">
+    <title>SwiftType</title>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+</file>
+
+<file path="src-tauri/src/config.rs">
+//! Configuration Module
+//!
+//! Handles loading, saving, and managing snippets configuration.
+
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::PathBuf;
+
+/// A single snippet/match definition
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Snippet {
+    /// Unique identifier for this snippet
+    #[serde(default = "generate_id")]
+    pub id: String,
+
+    /// The trigger text (e.g., ":hello")
+    #[serde(alias = "trigger")]
+    pub trigger: Option<String>,
+
+    /// Regex trigger pattern (alternative to exact trigger)
+    #[serde(alias = "regex")]
+    pub regex: Option<String>,
+
+    /// The replacement text
+    pub replace: String,
+
+    /// Optional label for display in UI
+    #[serde(default)]
+    pub label: Option<String>,
+
+    /// Word-based trigger (requires word boundary)
+    #[serde(default)]
+    pub word: bool,
+
+    /// Force uppercase matching
+    #[serde(default)]
+    pub uppercase_style: Option<String>,
+
+    /// Image path for image expansion
+    #[serde(default)]
+    pub image_path: Option<String>,
+
+    /// Shell command to execute
+    #[serde(default)]
+    pub shell: Option<String>,
+
+    /// Form fields for dynamic input
+    #[serde(default)]
+    pub form_fields: Option<Vec<FormField>>,
+
+    /// App-specific filter
+    #[serde(default)]
+    pub filter_app: Option<String>,
+
+    /// Category for organization
+    #[serde(default)]
+    pub category: Option<String>,
+
+    /// Usage count for tracking popularity
+    #[serde(default)]
+    pub usage_count: Option<u32>,
+
+    /// Last updated timestamp
+    #[serde(default)]
+    pub updated_at: Option<u64>,
+
+    /// Is favorite
+    #[serde(default)]
+    pub is_favorite: Option<bool>,
+
+    /// Deleted at timestamp (soft delete)
+    #[serde(default)]
+    pub deleted_at: Option<u64>,
+}
+
+/// Form field definition for dynamic snippets
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FormField {
+    pub name: String,
+    pub label: Option<String>,
+    #[serde(default)]
+    pub default: String,
+    #[serde(rename = "type", default = "default_field_type")]
+    pub field_type: String,
+    #[serde(default)]
+    pub choices: Option<Vec<String>>,
+}
+
+fn default_field_type() -> String {
+    "text".to_string()
+}
+
+fn generate_id() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    format!("snip_{}", timestamp)
+}
+
+/// Configuration file structure
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct Config {
+    /// List of snippets/matches
+    #[serde(default)]
+    pub matches: Vec<Snippet>,
+
+    /// Global variables
+    #[serde(default)]
+    pub global_vars: HashMap<String, String>,
+}
+
+/// Application settings (stored separately from snippets)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppSettings {
+    /// Enable/disable the expander
+    pub enabled: bool,
+
+    /// Injection method preference
+    pub injection_method: String, // "auto", "keystrokes", "clipboard"
+
+    /// Search bar hotkey
+    pub search_hotkey: String,
+
+    /// Backspace undo duration (ms)
+    pub undo_backspace_ms: u32,
+
+    /// Start with Windows
+    pub start_with_windows: bool,
+
+    /// Show in system tray
+    pub show_in_tray: bool,
+
+    /// Theme preference
+    pub theme: String, // "dark", "light", "system"
+
+    /// Toggle hotkey
+    pub toggle_hotkey: Option<String>,
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            injection_method: "auto".to_string(),
+            search_hotkey: "Alt+Space".to_string(),
+            undo_backspace_ms: 500,
+            start_with_windows: false,
+            show_in_tray: true,
+            theme: "dark".to_string(),
+            toggle_hotkey: None,
+        }
+    }
+}
+
+/// Configuration manager
+pub struct ConfigManager {
+    config: Config,
+    settings: AppSettings,
+    config_dir: PathBuf,
+}
+
+impl ConfigManager {
+    /// Create a new config manager
+    pub fn new() -> Result<Self, String> {
+        let config_dir = get_config_dir()?;
+
+        // Ensure config directory exists
+        std::fs::create_dir_all(&config_dir)
+            .map_err(|e| format!("Failed to create config directory: {}", e))?;
+
+        let mut manager = Self {
+            config: Config::default(),
+            settings: AppSettings::default(),
+            config_dir,
+        };
+
+        // Load existing config if available
+        manager.load()?;
+
+        Ok(manager)
+    }
+
+    /// Get the config directory path
+    #[allow(dead_code)]
+    pub fn config_dir(&self) -> &PathBuf {
+        &self.config_dir
+    }
+
+    /// Load configuration from disk
+    pub fn load(&mut self) -> Result<(), String> {
+        // Load snippets config
+        let config_path = self.config_dir.join("config.yml");
+        if config_path.exists() {
+            let content = std::fs::read_to_string(&config_path)
+                .map_err(|e| format!("Failed to read config file: {}", e))?;
+            self.config = serde_yaml::from_str(&content)
+                .map_err(|e| format!("Failed to parse config file: {}", e))?;
+        } else {
+            // Create default config
+            self.config = create_default_config();
+            self.save_config()?;
+        }
+
+        // Load settings
+        let settings_path = self.config_dir.join("settings.json");
+        if settings_path.exists() {
+            let content = std::fs::read_to_string(&settings_path)
+                .map_err(|e| format!("Failed to read settings file: {}", e))?;
+            self.settings = serde_json::from_str(&content)
+                .map_err(|e| format!("Failed to parse settings file: {}", e))?;
+        } else {
+            self.save_settings()?;
+        }
+
+        log::info!("Loaded {} snippets", self.config.matches.len());
+        Ok(())
+    }
+
+    /// Save snippets config to disk
+    pub fn save_config(&self) -> Result<(), String> {
+        let config_path = self.config_dir.join("config.yml");
+        let content = serde_yaml::to_string(&self.config)
+            .map_err(|e| format!("Failed to serialize config: {}", e))?;
+        std::fs::write(&config_path, content)
+            .map_err(|e| format!("Failed to write config file: {}", e))?;
+        Ok(())
+    }
+
+    /// Export snippets config to a specific path
+    pub fn export_data(&self, path: &str) -> Result<(), String> {
+        let content = serde_yaml::to_string(&self.config)
+            .map_err(|e| format!("Failed to serialize config: {}", e))?;
+        std::fs::write(path, content)
+            .map_err(|e| format!("Failed to write export file: {}", e))?;
+        Ok(())
+    }
+
+    /// Import snippets config from a specific path
+    pub fn import_data(&mut self, path: &str, merge: bool) -> Result<(), String> {
+        let content = std::fs::read_to_string(path)
+            .map_err(|e| format!("Failed to read import file: {}", e))?;
+        let imported_config: Config = serde_yaml::from_str(&content)
+            .map_err(|e| format!("Failed to parse imported config: {}", e))?;
+        
+        if merge {
+            for snippet in imported_config.matches {
+                if !self.config.matches.iter().any(|s| s.id == snippet.id) {
+                    self.config.matches.push(snippet);
+                }
+            }
+        } else {
+            self.config = imported_config;
+        }
+        self.save_config()
+    }
+
+    /// Save settings to disk
+    pub fn save_settings(&self) -> Result<(), String> {
+        let settings_path = self.config_dir.join("settings.json");
+        let content = serde_json::to_string_pretty(&self.settings)
+            .map_err(|e| format!("Failed to serialize settings: {}", e))?;
+        std::fs::write(&settings_path, content)
+            .map_err(|e| format!("Failed to write settings file: {}", e))?;
+        Ok(())
+    }
+
+    /// Get all snippets
+    pub fn snippets(&self) -> &[Snippet] {
+        &self.config.matches
+    }
+
+    /// Get snippets as mutable
+    #[allow(dead_code)]
+    pub fn snippets_mut(&mut self) -> &mut Vec<Snippet> {
+        &mut self.config.matches
+    }
+
+    /// Get settings
+    pub fn settings(&self) -> &AppSettings {
+        &self.settings
+    }
+
+    /// Get settings as mutable
+    pub fn settings_mut(&mut self) -> &mut AppSettings {
+        &mut self.settings
+    }
+
+    /// Add a new snippet
+    pub fn add_snippet(&mut self, snippet: Snippet) {
+        self.config.matches.push(snippet);
+    }
+
+    /// Remove a snippet by ID
+    pub fn remove_snippet(&mut self, id: &str) -> bool {
+        if let Some(pos) = self.config.matches.iter().position(|s| s.id == id) {
+            self.config.matches.remove(pos);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Update a snippet by ID
+    pub fn update_snippet(&mut self, id: &str, snippet: Snippet) -> bool {
+        if let Some(existing) = self.config.matches.iter_mut().find(|s| s.id == id) {
+            *existing = snippet;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Increment usage count for a snippet
+    pub fn increment_usage(&mut self, id: &str) -> Result<(), String> {
+        if let Some(existing) = self.config.matches.iter_mut().find(|s| s.id == id) {
+            existing.usage_count = Some(existing.usage_count.unwrap_or(0) + 1);
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            existing.updated_at = Some(now);
+            self.save_config()
+        } else {
+            Err(format!("Snippet not found: {}", id))
+        }
+    }
+
+    /// Find a snippet that matches the given buffer
+    #[allow(dead_code)]
+    pub fn find_matching_snippet(&self, buffer: &str) -> Option<&Snippet> {
+        for snippet in &self.config.matches {
+            if let Some(ref trigger) = snippet.trigger {
+                if buffer.ends_with(trigger) {
+                    return Some(snippet);
+                }
+            }
+            // TODO: Add regex matching
+        }
+        None
+    }
+}
+
+/// Get the configuration directory path
+fn get_config_dir() -> Result<PathBuf, String> {
+    let base = dirs::config_dir()
+        .or_else(|| dirs::home_dir().map(|h| h.join(".config")))
+        .ok_or_else(|| "Could not determine config directory".to_string())?;
+    Ok(base.join("swifttype"))
+}
+
+/// Create default configuration with example snippets
+fn create_default_config() -> Config {
+    Config {
+        matches: vec![
+            Snippet {
+                id: "example_hello".to_string(),
+                trigger: Some(":hello".to_string()),
+                regex: None,
+                replace: "Hello, World!".to_string(),
+                label: Some("Hello World".to_string()),
+                word: false,
+                uppercase_style: None,
+                image_path: None,
+                shell: None,
+                form_fields: None,
+                filter_app: None,
+                category: Some("General".to_string()),
+                usage_count: Some(42),
+                updated_at: Some(1715424000), // Arbitrary past timestamp
+                is_favorite: None,
+                deleted_at: None,
+            },
+            Snippet {
+                id: "example_date".to_string(),
+                trigger: Some(":date".to_string()),
+                regex: None,
+                replace: "{{date}}".to_string(),
+                label: Some("Current Date".to_string()),
+                word: false,
+                uppercase_style: None,
+                image_path: None,
+                shell: None,
+                form_fields: None,
+                filter_app: None,
+                category: Some("Development".to_string()),
+                usage_count: Some(15),
+                updated_at: Some(1715424000),
+                is_favorite: None,
+                deleted_at: None,
+            },
+            Snippet {
+                id: "example_email".to_string(),
+                trigger: Some(":email".to_string()),
+                regex: None,
+                replace: "example@email.com".to_string(),
+                label: Some("Email Address".to_string()),
+                word: false,
+                uppercase_style: None,
+                image_path: None,
+                shell: None,
+                form_fields: None,
+                filter_app: None,
+                category: Some("Communication".to_string()),
+                usage_count: Some(89),
+                updated_at: Some(1715424000),
+                is_favorite: None,
+                deleted_at: None,
+            },
+        ],
+        global_vars: HashMap::new(),
+    }
+}
+
+// Add dirs crate dependency - this will be added to Cargo.toml
+</file>
+
+<file path="src-tauri/src/text_injector.rs">
+//! Text Injector Module
+//!
+//! Handles injecting replacement text via simulated keystrokes or clipboard.
+
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP,
+    KEYEVENTF_UNICODE, VIRTUAL_KEY, VK_BACK, VK_CONTROL,
+};
+
+use crate::keyboard_hook;
+
+/// Injection method
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum InjectionMethod {
+    /// Simulate keystrokes (default)
+    Keystrokes,
+    /// Use clipboard paste (faster for long text)
+    Clipboard,
+    /// Automatically choose based on text length
+    Auto,
+}
+
+impl Default for InjectionMethod {
+    fn default() -> Self {
+        InjectionMethod::Auto
+    }
+}
+
+/// Always use clipboard for injection to avoid keystroke race conditions with the global hook
+const CLIPBOARD_THRESHOLD: usize = 0;
+
+/// Send a single virtual key press
+fn send_key(vk: VIRTUAL_KEY, key_up: bool) {
+    let flags = if key_up {
+        KEYEVENTF_KEYUP
+    } else {
+        KEYBD_EVENT_FLAGS::default()
+    };
+
+    let input = INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: vk,
+                wScan: 0,
+                dwFlags: flags,
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    };
+
+    unsafe {
+        SendInput(&[input], std::mem::size_of::<INPUT>() as i32);
+    }
+}
+
+/// Send a Unicode character (UTF-16 code unit)
+fn send_unicode_char(scan_code: u16) {
+    // Key down
+    let input_down = INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: VIRTUAL_KEY(0),
+                wScan: scan_code,
+                dwFlags: KEYEVENTF_UNICODE,
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    };
+
+    unsafe {
+        SendInput(&[input_down], std::mem::size_of::<INPUT>() as i32);
+    }
+    
+    // Tiny delay between down and up
+    std::thread::sleep(std::time::Duration::from_millis(1));
+
+    // Key up
+    let input_up = INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: VIRTUAL_KEY(0),
+                wScan: scan_code,
+                dwFlags: KEYEVENTF_UNICODE | KEYEVENTF_KEYUP,
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    };
+
+    unsafe {
+        SendInput(&[input_up], std::mem::size_of::<INPUT>() as i32);
+    }
+    
+    // Tiny delay between characters
+    std::thread::sleep(std::time::Duration::from_millis(1));
+}
+
+/// Send multiple backspace key presses (caller must manage IS_INJECTING flag)
+pub fn send_backspaces(count: usize) {
+    for _ in 0..count {
+        send_key(VK_BACK, false);
+        std::thread::sleep(std::time::Duration::from_millis(1));
+        send_key(VK_BACK, true);
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+}
+
+/// Inject text using keystrokes (caller must manage IS_INJECTING flag)
+fn inject_via_keystrokes(text: &str) {
+    for unit in text.encode_utf16() {
+        send_unicode_char(unit);
+    }
+}
+
+/// Inject text using clipboard
+fn inject_via_clipboard(text: &str) -> Result<(), String> {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::System::DataExchange::{
+        CloseClipboard, EmptyClipboard, GetClipboardData, OpenClipboard, SetClipboardData,
+    };
+    use windows::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE};
+
+    keyboard_hook::set_injecting(true);
+
+    let mut backup_text: Option<String> = None;
+
+    let result = unsafe {
+        // Open clipboard for backup
+        if OpenClipboard(HWND::default()).is_ok() {
+            if let Ok(handle) = GetClipboardData(13) {
+                let hglobal = windows::Win32::Foundation::HGLOBAL(handle.0);
+                let ptr = GlobalLock(hglobal);
+                if !ptr.is_null() {
+                    let mut len = 0;
+                    let wptr = ptr as *const u16;
+                    while *wptr.add(len) != 0 {
+                        len += 1;
+                    }
+                    let slice = std::slice::from_raw_parts(wptr, len);
+                    backup_text = Some(String::from_utf16_lossy(slice));
+                    let _ = GlobalUnlock(hglobal);
+                }
+            }
+            // Empty clipboard
+            if let Err(e) = EmptyClipboard() {
+                let _ = CloseClipboard();
+                return Err(format!("Failed to empty clipboard: {:?}", e));
+            }
+
+            // Convert text to UTF-16
+            let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+            let size = wide.len() * 2;
+
+            // Allocate global memory
+            if let Ok(hglobal) = GlobalAlloc(GMEM_MOVEABLE, size) {
+                let ptr = GlobalLock(hglobal);
+                if !ptr.is_null() {
+                    std::ptr::copy_nonoverlapping(wide.as_ptr(), ptr as *mut u16, wide.len());
+                    let _ = GlobalUnlock(hglobal);
+
+                    if let Err(e) =
+                        SetClipboardData(13, windows::Win32::Foundation::HANDLE(hglobal.0))
+                    {
+                        log::error!("Failed to set clipboard data: {:?}", e);
+                    }
+                }
+            }
+
+            let _ = CloseClipboard();
+            Ok(())
+        } else {
+            Err("Failed to open clipboard".to_string())
+        }
+    };
+
+    if result.is_ok() {
+        // Wait for OS to process clipboard before pasting
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        // Simulate Ctrl+V
+        send_key(VK_CONTROL, false);
+        send_key(VIRTUAL_KEY(0x56), false); // V key
+        send_key(VIRTUAL_KEY(0x56), true);
+        send_key(VK_CONTROL, true);
+
+        // Wait for paste to complete
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        // Restore clipboard
+        if let Some(backup) = backup_text {
+            unsafe {
+                if OpenClipboard(HWND::default()).is_ok() {
+                    let _ = EmptyClipboard();
+
+                    let wide: Vec<u16> = backup.encode_utf16().chain(std::iter::once(0)).collect();
+                    let size = wide.len() * 2;
+                    if let Ok(hglobal) = GlobalAlloc(GMEM_MOVEABLE, size) {
+                        let ptr = GlobalLock(hglobal);
+                        if !ptr.is_null() {
+                            std::ptr::copy_nonoverlapping(
+                                wide.as_ptr(),
+                                ptr as *mut u16,
+                                wide.len(),
+                            );
+                            let _ = GlobalUnlock(hglobal);
+                            let _ =
+                                SetClipboardData(13, windows::Win32::Foundation::HANDLE(hglobal.0));
+                        }
+                    }
+                    let _ = CloseClipboard();
+                }
+            }
+        }
+    }
+
+    keyboard_hook::set_injecting(false);
+    result
+}
+
+/// Inject replacement text using the specified method
+pub fn inject_text(text: &str, method: InjectionMethod) -> Result<(), String> {
+    let actual_method = match method {
+        InjectionMethod::Auto => {
+            if text.len() > CLIPBOARD_THRESHOLD {
+                InjectionMethod::Clipboard
+            } else {
+                InjectionMethod::Keystrokes
+            }
+        }
+        other => other,
+    };
+
+    match actual_method {
+        InjectionMethod::Keystrokes => {
+            inject_via_keystrokes(text);
+            Ok(())
+        }
+        InjectionMethod::Clipboard => inject_via_clipboard(text),
+        InjectionMethod::Auto => unreachable!(),
+    }
+}
+
+/// Perform a text replacement: remove trigger chars and inject replacement
+pub fn replace_text(
+    trigger_len: usize,
+    replacement: &str,
+    method: InjectionMethod,
+) -> Result<(), String> {
+    // Hold the injecting flag for the ENTIRE operation so the hook never
+    // processes any events (backspaces or paste echoes) mid-replacement.
+    keyboard_hook::set_injecting(true);
+
+    // Send backspaces to remove the trigger
+    send_backspaces(trigger_len);
+
+    // Give the OS time to process all backspaces
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    // Inject the replacement text
+    let result = inject_text(replacement, method);
+
+    keyboard_hook::set_injecting(false);
+
+    result
+}
+</file>
+
+<file path="src-tauri/src/trigger_engine.rs">
+//! Trigger Engine Module
+//!
+//! Handles trigger detection, variable expansion, and text replacement coordination.
+
+use chrono::Local;
+use parking_lot::RwLock;
+use regex::Regex;
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use crate::config::ConfigManager;
+use crate::text_injector::{replace_text, InjectionMethod};
+
+/// Compiled regex cache
+pub struct TriggerEngine {
+    config: Arc<RwLock<ConfigManager>>,
+    regex_cache: HashMap<String, Regex>,
+    injection_method: InjectionMethod,
+    enabled: bool,
+}
+
+impl TriggerEngine {
+    /// Create a new trigger engine
+    pub fn new(config: Arc<RwLock<ConfigManager>>) -> Self {
+        let injection_method = {
+            let cfg = config.read();
+            match cfg.settings().injection_method.as_str() {
+                "keystrokes" => InjectionMethod::Keystrokes,
+                "clipboard" => InjectionMethod::Clipboard,
+                _ => InjectionMethod::Auto,
+            }
+        };
+
+        Self {
+            config,
+            regex_cache: HashMap::new(),
+            injection_method,
+            enabled: true,
+        }
+    }
+
+    /// Enable or disable the engine
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
+
+    /// Check if engine is enabled
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    /// Set injection method
+    #[allow(dead_code)]
+    pub fn set_injection_method(&mut self, method: InjectionMethod) {
+        self.injection_method = method;
+    }
+
+    /// Process a keystroke buffer and check for triggers
+    pub fn process_buffer(&mut self, buffer: &str) -> Option<ExpansionResult> {
+        if !self.enabled {
+            return None;
+        }
+
+        // Collect matching info first to avoid borrow issues
+        let _match_info: Option<(
+            Option<(String, usize)>,
+            Option<(String, String, String, bool)>,
+        )> = {
+            let config = self.config.read();
+
+            for snippet in config.snippets() {
+                // Check exact trigger
+                if let Some(ref trigger) = snippet.trigger {
+                    if buffer.ends_with(trigger) {
+                        return Some(ExpansionResult {
+                            trigger_len: trigger.len(),
+                            replacement: self.expand_variables(&snippet.replace),
+                            snippet_id: snippet.id.clone(),
+                            has_form: snippet.form_fields.is_some(),
+                        });
+                    }
+                }
+
+                // Check regex trigger - collect data for later processing
+                if let Some(ref regex_pattern) = snippet.regex {
+                    // Clone what we need to check regex outside the config borrow
+                    let pattern = regex_pattern.clone();
+                    let replace_text = snippet.replace.clone();
+                    let snip_id = snippet.id.clone();
+                    let has_form = snippet.form_fields.is_some();
+                    drop(config);
+
+                    if let Some(result) = self.check_regex_trigger(
+                        buffer,
+                        &pattern,
+                        &replace_text,
+                        &snip_id,
+                        has_form,
+                    ) {
+                        return Some(result);
+                    }
+
+                    // Re-acquire config for next iteration
+                    // But since we found no match, continue checking
+                    // For simplicity, just return None here and let caller retry
+                    return None;
+                }
+            }
+            None
+        };
+
+        None
+    }
+
+    /// Check for regex trigger match
+    fn check_regex_trigger(
+        &mut self,
+        buffer: &str,
+        pattern: &str,
+        replace_text: &str,
+        snippet_id: &str,
+        has_form: bool,
+    ) -> Option<ExpansionResult> {
+        // Get or compile regex
+        let regex = if let Some(cached) = self.regex_cache.get(pattern) {
+            cached
+        } else {
+            match Regex::new(pattern) {
+                Ok(re) => {
+                    self.regex_cache.insert(pattern.to_string(), re);
+                    self.regex_cache.get(pattern).unwrap()
+                }
+                Err(e) => {
+                    log::error!("Invalid regex pattern '{}': {}", pattern, e);
+                    return None;
+                }
+            }
+        };
+
+        // Check if buffer ends with a match
+        if let Some(mat) = regex.find(buffer) {
+            if mat.end() == buffer.len() {
+                let matched_text = mat.as_str();
+                let replacement = regex.replace(matched_text, replace_text);
+                let replacement = self.expand_variables(&replacement);
+
+                return Some(ExpansionResult {
+                    trigger_len: matched_text.len(),
+                    replacement,
+                    snippet_id: snippet_id.to_string(),
+                    has_form,
+                });
+            }
+        }
+
+        None
+    }
+
+    /// Expand built-in variables in replacement text
+    fn expand_variables(&self, text: &str) -> String {
+        let now = Local::now();
+
+        let mut result = text.to_string();
+
+        // Date/time variables
+        result = result.replace("{{date}}", &now.format("%Y-%m-%d").to_string());
+        result = result.replace("{{time}}", &now.format("%H:%M:%S").to_string());
+        result = result.replace("{{datetime}}", &now.format("%Y-%m-%d %H:%M:%S").to_string());
+        result = result.replace("{{year}}", &now.format("%Y").to_string());
+        result = result.replace("{{month}}", &now.format("%m").to_string());
+        result = result.replace("{{day}}", &now.format("%d").to_string());
+        result = result.replace("{{hour}}", &now.format("%H").to_string());
+        result = result.replace("{{minute}}", &now.format("%M").to_string());
+        result = result.replace("{{second}}", &now.format("%S").to_string());
+
+        // Day names
+        result = result.replace("{{weekday}}", &now.format("%A").to_string());
+        result = result.replace("{{weekday_short}}", &now.format("%a").to_string());
+        result = result.replace("{{month_name}}", &now.format("%B").to_string());
+        result = result.replace("{{month_short}}", &now.format("%b").to_string());
+
+        // Clipboard (if requested)
+        if result.contains("{{clipboard}}") {
+            if let Some(clip_text) = get_clipboard_text() {
+                result = result.replace("{{clipboard}}", &clip_text);
+            } else {
+                result = result.replace("{{clipboard}}", "");
+            }
+        }
+
+        result
+    }
+
+    /// Execute the expansion
+    pub fn execute_expansion(&self, result: &ExpansionResult) -> Result<(), String> {
+        replace_text(
+            result.trigger_len,
+            &result.replacement,
+            self.injection_method,
+        )?;
+        log::info!("Expanded snippet: {}", result.snippet_id);
+
+        // Increment usage count
+        let mut cfg = self.config.write();
+        if let Err(e) = cfg.increment_usage(&result.snippet_id) {
+            log::warn!("Failed to increment usage stats: {}", e);
+        }
+
+        Ok(())
+    }
+}
+
+/// Result of a trigger match
+#[derive(Debug, Clone)]
+pub struct ExpansionResult {
+    /// Number of characters to remove (trigger length)
+    pub trigger_len: usize,
+    /// The replacement text (with variables expanded)
+    pub replacement: String,
+    /// ID of the matched snippet
+    pub snippet_id: String,
+    /// Whether this snippet has form fields
+    pub has_form: bool,
+}
+
+/// Get text from clipboard
+fn get_clipboard_text() -> Option<String> {
+    use windows::Win32::Foundation::{HGLOBAL, HWND};
+    use windows::Win32::System::DataExchange::{CloseClipboard, GetClipboardData, OpenClipboard};
+    use windows::Win32::System::Memory::{GlobalLock, GlobalUnlock};
+
+    unsafe {
+        if OpenClipboard(HWND::default()).is_err() {
+            return None;
+        }
+
+        // CF_UNICODETEXT = 13
+        let handle = match GetClipboardData(13) {
+            Ok(h) => h,
+            Err(_) => {
+                let _ = CloseClipboard();
+                return None;
+            }
+        };
+
+        // Convert HANDLE to HGLOBAL
+        let hglobal = HGLOBAL(handle.0);
+
+        let ptr = GlobalLock(hglobal);
+        if ptr.is_null() {
+            let _ = CloseClipboard();
+            return None;
+        }
+
+        // Read UTF-16 string
+        let mut len = 0;
+        let wptr = ptr as *const u16;
+        while *wptr.add(len) != 0 {
+            len += 1;
+        }
+
+        let slice = std::slice::from_raw_parts(wptr, len);
+        let text = String::from_utf16_lossy(slice);
+
+        let _ = GlobalUnlock(hglobal);
+        let _ = CloseClipboard();
+
+        Some(text)
+    }
+}
+</file>
+
 <file path="src/App.css">
 @import './styles/variables.css';
 @import './styles/base.css';
@@ -2805,12 +3692,14 @@ import { Toggle } from "./components/ui/Toggle";
 
 // Main App Component
 function App() {
-  const [activeTab, setActiveTab] = useState<"snippets" | "settings" | "editor">("snippets");
+  const [activeTab, setActiveTab] = useState<string>("snippets");
   const [snippets, setSnippets] = useState<Snippet[]>([]);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [engineStatus, setEngineStatus] = useState<EngineStatus | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [editingSnippet, setEditingSnippet] = useState<Snippet | null>(null);
+
+  const existingCategories = Array.from(new Set(snippets.filter(s => !s.deleted_at).map(s => s.category || "General"))).sort();
 
   // Load data on mount
   useEffect(() => {
@@ -2887,9 +3776,26 @@ function App() {
     }
   };
 
+  const handleUpdateSnippet = async (id: string, snippet: Snippet) => {
+    try {
+      await invoke("update_snippet", { id, snippet });
+      await loadData();
+    } catch (err) {
+      console.error("Failed to update snippet:", err);
+    }
+  };
+
   const handleDeleteSnippet = async (id: string) => {
     try {
-      await invoke("delete_snippet", { id });
+      const snippet = snippets.find(s => s.id === id);
+      if (snippet && !snippet.deleted_at && activeTab !== "trash") {
+        // Soft delete
+        const updated = { ...snippet, deleted_at: Date.now() };
+        await invoke("update_snippet", { id, snippet: updated });
+      } else {
+        // Hard delete
+        await invoke("delete_snippet", { id });
+      }
       await loadData();
     } catch (err) {
       console.error("Failed to delete snippet:", err);
@@ -2912,6 +3818,7 @@ function App() {
       <Sidebar 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
+        snippets={snippets}
         onNewSnippet={handleNewSnippet}
       />
 
@@ -2948,11 +3855,13 @@ function App() {
           </div>
         </header>
 
-        {activeTab === "snippets" && (
+        {(activeTab === "snippets" || activeTab === "favorites" || activeTab === "trash" || activeTab.startsWith("collection:")) && (
           <SnippetsView
+            activeTab={activeTab}
             snippets={snippets}
             onEdit={handleEditSnippet}
             onDelete={handleDeleteSnippet}
+            onUpdate={handleUpdateSnippet}
           />
         )}
         
@@ -2963,6 +3872,7 @@ function App() {
         {activeTab === "editor" && (
           <SnippetEditor
             snippet={editingSnippet}
+            existingCategories={existingCategories}
             onSave={handleSaveSnippet}
             onClose={() => {
               setActiveTab("snippets");
@@ -2976,513 +3886,6 @@ function App() {
 }
 
 export default App;
-</file>
-
-<file path="src-tauri/src/text_injector.rs">
-//! Text Injector Module
-//! 
-//! Handles injecting replacement text via simulated keystrokes or clipboard.
-
-use windows::Win32::UI::Input::KeyboardAndMouse::{
-    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, 
-    KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, KEYEVENTF_UNICODE,
-    VK_BACK, VK_CONTROL, VIRTUAL_KEY,
-};
-
-use crate::keyboard_hook;
-
-/// Injection method
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum InjectionMethod {
-    /// Simulate keystrokes (default)
-    Keystrokes,
-    /// Use clipboard paste (faster for long text)
-    Clipboard,
-    /// Automatically choose based on text length
-    Auto,
-}
-
-impl Default for InjectionMethod {
-    fn default() -> Self {
-        InjectionMethod::Auto
-    }
-}
-
-/// Threshold for switching to clipboard method in auto mode
-const CLIPBOARD_THRESHOLD: usize = 32;
-
-/// Send a single virtual key press
-fn send_key(vk: VIRTUAL_KEY, key_up: bool) {
-    let flags = if key_up { KEYEVENTF_KEYUP } else { KEYBD_EVENT_FLAGS::default() };
-    
-    let input = INPUT {
-        r#type: INPUT_KEYBOARD,
-        Anonymous: INPUT_0 {
-            ki: KEYBDINPUT {
-                wVk: vk,
-                wScan: 0,
-                dwFlags: flags,
-                time: 0,
-                dwExtraInfo: 0,
-            },
-        },
-    };
-    
-    unsafe {
-        SendInput(&[input], std::mem::size_of::<INPUT>() as i32);
-    }
-}
-
-/// Send a Unicode character
-fn send_unicode_char(ch: char) {
-    let scan_code = ch as u16;
-    
-    // Key down
-    let input_down = INPUT {
-        r#type: INPUT_KEYBOARD,
-        Anonymous: INPUT_0 {
-            ki: KEYBDINPUT {
-                wVk: VIRTUAL_KEY(0),
-                wScan: scan_code,
-                dwFlags: KEYEVENTF_UNICODE,
-                time: 0,
-                dwExtraInfo: 0,
-            },
-        },
-    };
-    
-    // Key up
-    let input_up = INPUT {
-        r#type: INPUT_KEYBOARD,
-        Anonymous: INPUT_0 {
-            ki: KEYBDINPUT {
-                wVk: VIRTUAL_KEY(0),
-                wScan: scan_code,
-                dwFlags: KEYEVENTF_UNICODE | KEYEVENTF_KEYUP,
-                time: 0,
-                dwExtraInfo: 0,
-            },
-        },
-    };
-    
-    unsafe {
-        SendInput(&[input_down, input_up], std::mem::size_of::<INPUT>() as i32);
-    }
-}
-
-/// Send multiple backspace key presses
-pub fn send_backspaces(count: usize) {
-    keyboard_hook::set_injecting(true);
-    
-    for _ in 0..count {
-        send_key(VK_BACK, false);
-        send_key(VK_BACK, true);
-        // Small delay to ensure keys are processed
-        std::thread::sleep(std::time::Duration::from_micros(100));
-    }
-    
-    keyboard_hook::set_injecting(false);
-}
-
-/// Inject text using keystrokes
-fn inject_via_keystrokes(text: &str) {
-    keyboard_hook::set_injecting(true);
-    
-    for ch in text.chars() {
-        send_unicode_char(ch);
-        // Small delay between characters for reliability
-        std::thread::sleep(std::time::Duration::from_micros(50));
-    }
-    
-    keyboard_hook::set_injecting(false);
-}
-
-/// Inject text using clipboard
-fn inject_via_clipboard(text: &str) -> Result<(), String> {
-    use windows::Win32::System::DataExchange::{
-        OpenClipboard, CloseClipboard, EmptyClipboard, SetClipboardData, GetClipboardData,
-    };
-    use windows::Win32::System::Memory::{
-        GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE,
-    };
-    use windows::Win32::Foundation::HWND;
-    
-    keyboard_hook::set_injecting(true);
-    
-    let mut backup_text: Option<String> = None;
-
-    let result = unsafe {
-        // Open clipboard for backup
-        if OpenClipboard(HWND::default()).is_ok() {
-            if let Ok(handle) = GetClipboardData(13) {
-                let hglobal = windows::Win32::Foundation::HGLOBAL(handle.0);
-                let ptr = GlobalLock(hglobal);
-                if !ptr.is_null() {
-                    let mut len = 0;
-                    let wptr = ptr as *const u16;
-                    while *wptr.add(len) != 0 {
-                        len += 1;
-                    }
-                    let slice = std::slice::from_raw_parts(wptr, len);
-                    backup_text = Some(String::from_utf16_lossy(slice));
-                    let _ = GlobalUnlock(hglobal);
-                }
-            }
-            // Empty clipboard
-            if let Err(e) = EmptyClipboard() {
-                let _ = CloseClipboard();
-                return Err(format!("Failed to empty clipboard: {:?}", e));
-            }
-            
-            // Convert text to UTF-16
-            let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
-            let size = wide.len() * 2;
-            
-            // Allocate global memory
-            if let Ok(hglobal) = GlobalAlloc(GMEM_MOVEABLE, size) {
-                let ptr = GlobalLock(hglobal);
-                if !ptr.is_null() {
-                    std::ptr::copy_nonoverlapping(wide.as_ptr(), ptr as *mut u16, wide.len());
-                    let _ = GlobalUnlock(hglobal);
-                    
-                    if let Err(e) = SetClipboardData(13, windows::Win32::Foundation::HANDLE(hglobal.0)) {
-                        log::error!("Failed to set clipboard data: {:?}", e);
-                    }
-                }
-            }
-            
-            let _ = CloseClipboard();
-            Ok(())
-        } else {
-            Err("Failed to open clipboard".to_string())
-        }
-    };
-    
-    // Simulate Ctrl+V
-    if result.is_ok() {
-        send_key(VK_CONTROL, false);
-        send_key(VIRTUAL_KEY(0x56), false); // V key
-        send_key(VIRTUAL_KEY(0x56), true);
-        send_key(VK_CONTROL, true);
-        
-        // Wait for paste to complete (50ms is safer for OS to process)
-        std::thread::sleep(std::time::Duration::from_millis(50));
-        
-        // Restore clipboard
-        if let Some(backup) = backup_text {
-            unsafe {
-                if OpenClipboard(HWND::default()).is_ok() {
-                    let _ = EmptyClipboard();
-                    
-                    let wide: Vec<u16> = backup.encode_utf16().chain(std::iter::once(0)).collect();
-                    let size = wide.len() * 2;
-                    if let Ok(hglobal) = GlobalAlloc(GMEM_MOVEABLE, size) {
-                        let ptr = GlobalLock(hglobal);
-                        if !ptr.is_null() {
-                            std::ptr::copy_nonoverlapping(wide.as_ptr(), ptr as *mut u16, wide.len());
-                            let _ = GlobalUnlock(hglobal);
-                            let _ = SetClipboardData(13, windows::Win32::Foundation::HANDLE(hglobal.0));
-                        }
-                    }
-                    let _ = CloseClipboard();
-                }
-            }
-        }
-    }
-    
-    keyboard_hook::set_injecting(false);
-    result
-}
-
-/// Inject replacement text using the specified method
-pub fn inject_text(text: &str, method: InjectionMethod) -> Result<(), String> {
-    let actual_method = match method {
-        InjectionMethod::Auto => {
-            if text.len() > CLIPBOARD_THRESHOLD {
-                InjectionMethod::Clipboard
-            } else {
-                InjectionMethod::Keystrokes
-            }
-        }
-        other => other,
-    };
-    
-    match actual_method {
-        InjectionMethod::Keystrokes => {
-            inject_via_keystrokes(text);
-            Ok(())
-        }
-        InjectionMethod::Clipboard => inject_via_clipboard(text),
-        InjectionMethod::Auto => unreachable!(),
-    }
-}
-
-/// Perform a text replacement: remove trigger chars and inject replacement
-pub fn replace_text(trigger_len: usize, replacement: &str, method: InjectionMethod) -> Result<(), String> {
-    // First, send backspaces to remove the trigger
-    send_backspaces(trigger_len);
-    
-    // Small delay before injecting replacement
-    std::thread::sleep(std::time::Duration::from_millis(5));
-    
-    // Inject the replacement text
-    inject_text(replacement, method)?;
-    
-    Ok(())
-}
-</file>
-
-<file path="src-tauri/src/trigger_engine.rs">
-//! Trigger Engine Module
-//! 
-//! Handles trigger detection, variable expansion, and text replacement coordination.
-
-use chrono::Local;
-use regex::Regex;
-use std::collections::HashMap;
-use std::sync::Arc;
-use parking_lot::RwLock;
-
-use crate::config::ConfigManager;
-use crate::text_injector::{replace_text, InjectionMethod};
-
-/// Compiled regex cache
-pub struct TriggerEngine {
-    config: Arc<RwLock<ConfigManager>>,
-    regex_cache: HashMap<String, Regex>,
-    injection_method: InjectionMethod,
-    enabled: bool,
-}
-
-impl TriggerEngine {
-    /// Create a new trigger engine
-    pub fn new(config: Arc<RwLock<ConfigManager>>) -> Self {
-        let injection_method = {
-            let cfg = config.read();
-            match cfg.settings().injection_method.as_str() {
-                "keystrokes" => InjectionMethod::Keystrokes,
-                "clipboard" => InjectionMethod::Clipboard,
-                _ => InjectionMethod::Auto,
-            }
-        };
-        
-        Self {
-            config,
-            regex_cache: HashMap::new(),
-            injection_method,
-            enabled: true,
-        }
-    }
-    
-    /// Enable or disable the engine
-    pub fn set_enabled(&mut self, enabled: bool) {
-        self.enabled = enabled;
-    }
-    
-    /// Check if engine is enabled
-    pub fn is_enabled(&self) -> bool {
-        self.enabled
-    }
-    
-    /// Set injection method
-    #[allow(dead_code)]
-    pub fn set_injection_method(&mut self, method: InjectionMethod) {
-        self.injection_method = method;
-    }
-    
-    /// Process a keystroke buffer and check for triggers
-    pub fn process_buffer(&mut self, buffer: &str) -> Option<ExpansionResult> {
-        if !self.enabled {
-            return None;
-        }
-        
-        // Collect matching info first to avoid borrow issues
-        let _match_info: Option<(Option<(String, usize)>, Option<(String, String, String, bool)>)> = {
-            let config = self.config.read();
-            
-            for snippet in config.snippets() {
-                // Check exact trigger
-                if let Some(ref trigger) = snippet.trigger {
-                    if buffer.ends_with(trigger) {
-                        return Some(ExpansionResult {
-                            trigger_len: trigger.len(),
-                            replacement: self.expand_variables(&snippet.replace),
-                            snippet_id: snippet.id.clone(),
-                            has_form: snippet.form_fields.is_some(),
-                        });
-                    }
-                }
-                
-                // Check regex trigger - collect data for later processing
-                if let Some(ref regex_pattern) = snippet.regex {
-                    // Clone what we need to check regex outside the config borrow
-                    let pattern = regex_pattern.clone();
-                    let replace_text = snippet.replace.clone();
-                    let snip_id = snippet.id.clone();
-                    let has_form = snippet.form_fields.is_some();
-                    drop(config);
-                    
-                    if let Some(result) = self.check_regex_trigger(buffer, &pattern, &replace_text, &snip_id, has_form) {
-                        return Some(result);
-                    }
-                    
-                    // Re-acquire config for next iteration
-                    // But since we found no match, continue checking
-                    // For simplicity, just return None here and let caller retry
-                    return None;
-                }
-            }
-            None
-        };
-        
-        None
-    }
-    
-    /// Check for regex trigger match
-    fn check_regex_trigger(
-        &mut self, 
-        buffer: &str, 
-        pattern: &str, 
-        replace_text: &str,
-        snippet_id: &str,
-        has_form: bool,
-    ) -> Option<ExpansionResult> {
-        // Get or compile regex
-        let regex = if let Some(cached) = self.regex_cache.get(pattern) {
-            cached
-        } else {
-            match Regex::new(pattern) {
-                Ok(re) => {
-                    self.regex_cache.insert(pattern.to_string(), re);
-                    self.regex_cache.get(pattern).unwrap()
-                }
-                Err(e) => {
-                    log::error!("Invalid regex pattern '{}': {}", pattern, e);
-                    return None;
-                }
-            }
-        };
-        
-        // Check if buffer ends with a match
-        if let Some(mat) = regex.find(buffer) {
-            if mat.end() == buffer.len() {
-                let matched_text = mat.as_str();
-                let replacement = regex.replace(matched_text, replace_text);
-                let replacement = self.expand_variables(&replacement);
-                
-                return Some(ExpansionResult {
-                    trigger_len: matched_text.len(),
-                    replacement,
-                    snippet_id: snippet_id.to_string(),
-                    has_form,
-                });
-            }
-        }
-        
-        None
-    }
-    
-    /// Expand built-in variables in replacement text
-    fn expand_variables(&self, text: &str) -> String {
-        let now = Local::now();
-        
-        let mut result = text.to_string();
-        
-        // Date/time variables
-        result = result.replace("{{date}}", &now.format("%Y-%m-%d").to_string());
-        result = result.replace("{{time}}", &now.format("%H:%M:%S").to_string());
-        result = result.replace("{{datetime}}", &now.format("%Y-%m-%d %H:%M:%S").to_string());
-        result = result.replace("{{year}}", &now.format("%Y").to_string());
-        result = result.replace("{{month}}", &now.format("%m").to_string());
-        result = result.replace("{{day}}", &now.format("%d").to_string());
-        result = result.replace("{{hour}}", &now.format("%H").to_string());
-        result = result.replace("{{minute}}", &now.format("%M").to_string());
-        result = result.replace("{{second}}", &now.format("%S").to_string());
-        
-        // Day names
-        result = result.replace("{{weekday}}", &now.format("%A").to_string());
-        result = result.replace("{{weekday_short}}", &now.format("%a").to_string());
-        result = result.replace("{{month_name}}", &now.format("%B").to_string());
-        result = result.replace("{{month_short}}", &now.format("%b").to_string());
-        
-        // Clipboard (if requested)
-        if result.contains("{{clipboard}}") {
-            if let Some(clip_text) = get_clipboard_text() {
-                result = result.replace("{{clipboard}}", &clip_text);
-            } else {
-                result = result.replace("{{clipboard}}", "");
-            }
-        }
-        
-        result
-    }
-    
-    /// Execute the expansion
-    pub fn execute_expansion(&self, result: &ExpansionResult) -> Result<(), String> {
-        replace_text(result.trigger_len, &result.replacement, self.injection_method)?;
-        log::info!("Expanded snippet: {}", result.snippet_id);
-        Ok(())
-    }
-}
-
-/// Result of a trigger match
-#[derive(Debug, Clone)]
-pub struct ExpansionResult {
-    /// Number of characters to remove (trigger length)
-    pub trigger_len: usize,
-    /// The replacement text (with variables expanded)
-    pub replacement: String,
-    /// ID of the matched snippet
-    pub snippet_id: String,
-    /// Whether this snippet has form fields
-    pub has_form: bool,
-}
-
-/// Get text from clipboard
-fn get_clipboard_text() -> Option<String> {
-    use windows::Win32::System::DataExchange::{OpenClipboard, CloseClipboard, GetClipboardData};
-    use windows::Win32::System::Memory::{GlobalLock, GlobalUnlock};
-    use windows::Win32::Foundation::{HWND, HGLOBAL};
-    
-    unsafe {
-        if OpenClipboard(HWND::default()).is_err() {
-            return None;
-        }
-        
-        // CF_UNICODETEXT = 13
-        let handle = match GetClipboardData(13) {
-            Ok(h) => h,
-            Err(_) => {
-                let _ = CloseClipboard();
-                return None;
-            }
-        };
-        
-        // Convert HANDLE to HGLOBAL
-        let hglobal = HGLOBAL(handle.0);
-        
-        let ptr = GlobalLock(hglobal);
-        if ptr.is_null() {
-            let _ = CloseClipboard();
-            return None;
-        }
-        
-        // Read UTF-16 string
-        let mut len = 0;
-        let wptr = ptr as *const u16;
-        while *wptr.add(len) != 0 {
-            len += 1;
-        }
-        
-        let slice = std::slice::from_raw_parts(wptr, len);
-        let text = String::from_utf16_lossy(slice);
-        
-        let _ = GlobalUnlock(hglobal);
-        let _ = CloseClipboard();
-        
-        Some(text)
-    }
-}
 </file>
 
 <file path="package.json">
@@ -3503,6 +3906,8 @@ fn get_clipboard_text() -> Option<String> {
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-autostart": "^2.5.1",
+    "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-opener": "^2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
@@ -3521,20 +3926,19 @@ fn get_clipboard_text() -> Option<String> {
 
 <file path="src-tauri/src/keyboard_hook.rs">
 //! Keyboard Hook Module
-//! 
+//!
 //! Implements a global low-level keyboard hook using Windows API
 //! to capture keystrokes for text expansion functionality.
 
+use once_cell::sync::Lazy;
 use once_cell::sync::OnceCell;
+use parking_lot::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
-use parking_lot::Mutex;
-use once_cell::sync::Lazy;
 use windows::Win32::Foundation::{HINSTANCE, LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, SetWindowsHookExW, UnhookWindowsHookEx, 
-    HC_ACTION, HHOOK, KBDLLHOOKSTRUCT, WH_KEYBOARD_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
-    LLKHF_INJECTED, LLKHF_LOWER_IL_INJECTED,
+    CallNextHookEx, SetWindowsHookExW, UnhookWindowsHookEx, HC_ACTION, HHOOK, KBDLLHOOKSTRUCT,
+    LLKHF_INJECTED, LLKHF_LOWER_IL_INJECTED, WH_KEYBOARD_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
 };
 
 /// Keyboard event sent to the worker thread
@@ -3582,8 +3986,10 @@ pub fn is_injecting() -> bool {
 
 /// Convert virtual key code to character using current keyboard layout
 fn vk_to_char(vk_code: u32, scan_code: u32) -> Option<char> {
-    use windows::Win32::UI::Input::KeyboardAndMouse::{GetKeyboardState, ToUnicode, GetAsyncKeyState};
-    
+    use windows::Win32::UI::Input::KeyboardAndMouse::{
+        GetAsyncKeyState, GetKeyboardState, ToUnicode,
+    };
+
     let mut keyboard_state = [0u8; 256];
     let _ = unsafe { GetKeyboardState(&mut keyboard_state) };
 
@@ -3594,25 +4000,29 @@ fn vk_to_char(vk_code: u32, scan_code: u32) -> Option<char> {
 
     unsafe {
         // High bit for pressed state
-        keyboard_state[VK_SHIFT as usize] = if GetAsyncKeyState(VK_SHIFT) < 0 { 0x80 } else { 0 };
-        keyboard_state[VK_CONTROL as usize] = if GetAsyncKeyState(VK_CONTROL) < 0 { 0x80 } else { 0 };
-        keyboard_state[VK_MENU as usize] = if GetAsyncKeyState(VK_MENU) < 0 { 0x80 } else { 0 };
-        
+        keyboard_state[VK_SHIFT as usize] = if GetAsyncKeyState(VK_SHIFT) < 0 {
+            0x80
+        } else {
+            0
+        };
+        keyboard_state[VK_CONTROL as usize] = if GetAsyncKeyState(VK_CONTROL) < 0 {
+            0x80
+        } else {
+            0
+        };
+        keyboard_state[VK_MENU as usize] = if GetAsyncKeyState(VK_MENU) < 0 {
+            0x80
+        } else {
+            0
+        };
+
         // Low bit for toggled state (CapsLock)
         let caps_state = GetAsyncKeyState(VK_CAPITAL);
         keyboard_state[VK_CAPITAL as usize] = if (caps_state & 1) != 0 { 1 } else { 0 };
     }
 
     let mut buffer = [0u16; 4];
-    let result = unsafe {
-        ToUnicode(
-            vk_code,
-            scan_code,
-            Some(&keyboard_state),
-            &mut buffer,
-            0,
-        )
-    };
+    let result = unsafe { ToUnicode(vk_code, scan_code, Some(&keyboard_state), &mut buffer, 0) };
 
     if result > 0 {
         if let Ok(s) = String::from_utf16(&buffer[0..(result as usize)]) {
@@ -3633,15 +4043,15 @@ unsafe extern "system" fn keyboard_hook_callback(
     w_param: WPARAM,
     l_param: LPARAM,
 ) -> LRESULT {
-    // If we're injecting, skip processing
+    // If we're injecting, skip processing entirely - don't send to channel
     if is_injecting() {
         return CallNextHookEx(None, n_code, w_param, l_param);
     }
 
     if n_code == HC_ACTION as i32 {
         let kbd_struct = &*(l_param.0 as *const KBDLLHOOKSTRUCT);
-        
-        // Skip injected keys to prevent infinite loops
+
+        // Also skip injected keys from any process (belt + suspenders)
         let flags = kbd_struct.flags.0;
         if (flags & LLKHF_INJECTED.0) != 0 || (flags & LLKHF_LOWER_IL_INJECTED.0) != 0 {
             return CallNextHookEx(None, n_code, w_param, l_param);
@@ -3650,7 +4060,7 @@ unsafe extern "system" fn keyboard_hook_callback(
         let msg_type = w_param.0 as u32;
         if msg_type == WM_KEYDOWN || msg_type == WM_SYSKEYDOWN {
             let vk_code = kbd_struct.vkCode;
-            
+
             match vk_code {
                 VK_BACK => {
                     if let Some(sender) = HOOK_SENDER.get() {
@@ -3673,7 +4083,7 @@ unsafe extern "system" fn keyboard_hook_callback(
             }
         }
     }
-    
+
     // Always pass to the next hook. We never block keystrokes here to avoid deadlocks.
     CallNextHookEx(None, n_code, w_param, l_param)
 }
@@ -3681,7 +4091,7 @@ unsafe extern "system" fn keyboard_hook_callback(
 /// Install the keyboard hook
 pub fn install_hook() -> Result<(), String> {
     let mut handle = HOOK_HANDLE.lock();
-    
+
     if handle.is_some() {
         return Err("Hook already installed".to_string());
     }
@@ -3692,11 +4102,12 @@ pub fn install_hook() -> Result<(), String> {
             Some(keyboard_hook_callback),
             HINSTANCE::default(),
             0,
-        ).map_err(|e| format!("Failed to install hook: {:?}", e))?;
-        
+        )
+        .map_err(|e| format!("Failed to install hook: {:?}", e))?;
+
         *handle = Some(SendHHOOK(hook));
     }
-    
+
     log::info!("Keyboard hook installed successfully");
     Ok(())
 }
@@ -3705,15 +4116,14 @@ pub fn install_hook() -> Result<(), String> {
 #[allow(dead_code)]
 pub fn uninstall_hook() -> Result<(), String> {
     let mut handle = HOOK_HANDLE.lock();
-    
+
     if let Some(SendHHOOK(hook)) = handle.take() {
         unsafe {
-            UnhookWindowsHookEx(hook)
-                .map_err(|e| format!("Failed to uninstall hook: {:?}", e))?;
+            UnhookWindowsHookEx(hook).map_err(|e| format!("Failed to uninstall hook: {:?}", e))?;
         }
         log::info!("Keyboard hook uninstalled");
     }
-    
+
     Ok(())
 }
 
@@ -3725,25 +4135,25 @@ pub fn is_hook_installed() -> bool {
 
 <file path="src-tauri/src/lib.rs">
 //! SwiftType - A Modern Text Expander
-//! 
+//!
 //! Main library entry point that wires up the Tauri application
 //! with the text expansion engine.
 
+mod config;
 mod keyboard_hook;
 mod text_injector;
-mod config;
 mod trigger_engine;
 
-use std::sync::mpsc;
-use std::thread;
-use std::sync::Arc;
 use parking_lot::RwLock;
-use tauri::{Manager, State};
-use tauri::tray::{TrayIconBuilder, MouseButton, MouseButtonState, TrayIconEvent};
-use tauri::menu::{Menu, MenuItem};
 use serde::Serialize;
+use std::sync::mpsc;
+use std::sync::Arc;
+use std::thread;
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{Manager, State};
 
-use config::{ConfigManager, Snippet, AppSettings};
+use config::{AppSettings, ConfigManager, Snippet};
 use trigger_engine::TriggerEngine;
 
 /// Application state shared across commands
@@ -3794,6 +4204,20 @@ fn delete_snippet(state: State<AppState>, id: String) -> Result<bool, String> {
     Ok(deleted)
 }
 
+/// Export snippets to a YAML file
+#[tauri::command]
+fn export_snippets(state: State<AppState>, path: String) -> Result<(), String> {
+    let config = state.config.read();
+    config.export_data(&path)
+}
+
+/// Import snippets from a YAML file
+#[tauri::command]
+fn import_snippets(state: State<AppState>, path: String, merge: bool) -> Result<(), String> {
+    let mut config = state.config.write();
+    config.import_data(&path, merge)
+}
+
 // ============================================================================
 // Tauri Commands - Settings
 // ============================================================================
@@ -3806,10 +4230,28 @@ fn get_settings(state: State<AppState>) -> AppSettings {
 
 /// Update application settings
 #[tauri::command]
-fn update_settings(state: State<AppState>, settings: AppSettings) -> Result<(), String> {
+fn update_settings(
+    app: tauri::AppHandle,
+    state: State<AppState>,
+    settings: AppSettings,
+) -> Result<(), String> {
     let mut config = state.config.write();
+    let old_start = config.settings().start_with_windows;
+    let new_start = settings.start_with_windows;
+
     *config.settings_mut() = settings;
     config.save_settings()?;
+
+    if old_start != new_start {
+        use tauri_plugin_autostart::ManagerExt;
+        let autostart = app.autolaunch();
+        if new_start {
+            let _ = autostart.enable();
+        } else {
+            let _ = autostart.disable();
+        }
+    }
+
     Ok(())
 }
 
@@ -3832,11 +4274,11 @@ fn get_engine_status(state: State<AppState>) -> EngineStatus {
 fn toggle_engine(state: State<AppState>, enabled: bool) -> Result<(), String> {
     let mut engine = state.engine.write();
     engine.set_enabled(enabled);
-    
+
     if enabled && !keyboard_hook::is_hook_installed() {
         keyboard_hook::install_hook()?;
     }
-    
+
     Ok(())
 }
 
@@ -3867,8 +4309,9 @@ struct EngineStatus {
 fn search_snippets(state: State<AppState>, query: String) -> Vec<Snippet> {
     let config = state.config.read();
     let query_lower = query.to_lowercase();
-    
-    config.snippets()
+
+    config
+        .snippets()
         .iter()
         .filter(|s| {
             if let Some(ref trigger) = s.trigger {
@@ -3896,34 +4339,38 @@ fn spawn_worker_thread(
     shared_buffer: Arc<RwLock<String>>,
 ) -> Result<(), &'static str> {
     let (tx, rx) = mpsc::channel();
-    
+
     keyboard_hook::set_event_sender(tx)?;
-    
+
     thread::spawn(move || {
         for event in rx {
             let mut current_buffer = shared_buffer.write();
-            
+
             match event {
                 keyboard_hook::HookEvent::Char(c) => {
-                    current_buffer.push(c);
-                    // Prevent buffer from growing unbounded
-                    if current_buffer.len() > 256 {
-                        let drain_count = current_buffer.len() - 128;
-                        current_buffer.drain(..drain_count);
+                    if !keyboard_hook::is_injecting() {
+                        current_buffer.push(c);
+                        // Prevent buffer from growing unbounded
+                        if current_buffer.len() > 256 {
+                            let drain_count = current_buffer.len() - 128;
+                            current_buffer.drain(..drain_count);
+                        }
                     }
                 }
                 keyboard_hook::HookEvent::Backspace => {
-                    current_buffer.pop();
+                    if !keyboard_hook::is_injecting() {
+                        current_buffer.pop();
+                    }
                 }
                 keyboard_hook::HookEvent::Clear => {
                     current_buffer.clear();
                 }
             }
-            
+
             // Clone buffer and release lock before evaluating triggers
             let buffer_content = current_buffer.clone();
             drop(current_buffer);
-            
+
             let mut eng = engine.write();
             if let Some(result) = eng.process_buffer(&buffer_content) {
                 if !result.has_form {
@@ -3934,22 +4381,20 @@ fn spawn_worker_thread(
                         shared_buffer.write().clear();
                     }
                 }
-                // TODO: Handle form-based snippets by emitting event to frontend
             }
         }
     });
-    
+
     Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Initialize logger
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
-        .init();
-    
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+
     log::info!("Starting SwiftType...");
-    
+
     // Initialize configuration
     let config = match ConfigManager::new() {
         Ok(cfg) => Arc::new(RwLock::new(cfg)),
@@ -3959,25 +4404,34 @@ pub fn run() {
             return;
         }
     };
-    
+
     // Initialize trigger engine
     let engine = Arc::new(RwLock::new(TriggerEngine::new(config.clone())));
-    
+
     let shared_buffer = Arc::new(RwLock::new(String::with_capacity(256)));
-    
+
     // Set up background worker
     if let Err(e) = spawn_worker_thread(engine.clone(), shared_buffer.clone()) {
         log::error!("Failed to spawn worker thread: {}", e);
     }
-    
+
     // Install keyboard hook
     if let Err(e) = keyboard_hook::install_hook() {
         log::error!("Failed to install keyboard hook: {}", e);
     }
-    
-    let app_state = AppState { config, engine, keystroke_buffer: shared_buffer };
-    
+
+    let app_state = AppState {
+        config,
+        engine,
+        keystroke_buffer: shared_buffer,
+    };
+
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec![]),
+        ))
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
@@ -4000,7 +4454,12 @@ pub fn run() {
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
                         if let Some(window) = tray.app_handle().get_webview_window("main") {
                             let _ = window.show();
                             let _ = window.set_focus();
@@ -4008,6 +4467,13 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+
+            // Always show the main window on startup
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+
             Ok(())
         })
         .manage(app_state)
@@ -4018,6 +4484,8 @@ pub fn run() {
             update_snippet,
             delete_snippet,
             search_snippets,
+            export_snippets,
+            import_snippets,
             // Settings
             get_settings,
             update_settings,

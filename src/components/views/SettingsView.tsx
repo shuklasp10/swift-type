@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { AppSettings, SettingsViewProps } from "../../types";
 import { Button } from "../ui/Button";
 import { Toggle } from "../ui/Toggle";
+import { save, open } from "@tauri-apps/plugin-dialog";
 
 export function SettingsView({ settings, onSave }: SettingsViewProps) {
   const [localSettings, setLocalSettings] = useState<AppSettings | null>(settings);
@@ -22,6 +23,40 @@ export function SettingsView({ settings, onSave }: SettingsViewProps) {
     } catch (err) {
       console.error("Failed to save settings:", err);
       setLocalSettings(localSettings); // Revert on failure
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      const filePath = await save({
+        filters: [{ name: 'SwiftType Backup', extensions: ['yml', 'yaml'] }],
+        defaultPath: 'swifttype_backup.yml',
+      });
+      if (filePath) {
+        await invoke("export_snippets", { path: filePath });
+        alert("Snippets exported successfully!");
+      }
+    } catch (err) {
+      console.error("Export failed:", err);
+      alert("Failed to export snippets.");
+    }
+  };
+
+  const handleImport = async () => {
+    try {
+      const filePath = await open({
+        filters: [{ name: 'SwiftType Backup', extensions: ['yml', 'yaml'] }],
+        multiple: false,
+      });
+      if (filePath) {
+        const merge = window.confirm("Do you want to MERGE these snippets with your existing ones?\n\n(Click 'OK' to MERGE, click 'Cancel' to OVERWRITE)");
+        await invoke("import_snippets", { path: filePath, merge });
+        onSave(); // trigger data reload
+        alert("Snippets imported successfully!");
+      }
+    } catch (err) {
+      console.error("Import failed:", err);
+      alert("Failed to import snippets.");
     }
   };
 
@@ -164,41 +199,31 @@ export function SettingsView({ settings, onSave }: SettingsViewProps) {
                 <h3 className="settings-card-title">Data Management</h3>
               </div>
               <p className="settings-card-desc">
-                Manage your snippet database, sync with the cloud, or create local backups.
+                Create local backups and restore your snippets.
               </p>
 
               <div className="action-cards-grid">
                 <div className="action-card">
                   <div className="action-card-header">
-                    <span className="material-symbols-outlined">cloud_sync</span>
-                    <h4>Cloud Sync</h4>
+                    <span className="material-symbols-outlined">download</span>
+                    <h4>Export Backup</h4>
                   </div>
-                  <p>Last synced: Today at 10:42 AM.</p>
-                  <Button variant="secondary" className="action-btn-full" onClick={() => {}}>
-                    Sync Now
+                  <p>Download all snippets as a YAML file.</p>
+                  <Button variant="secondary" className="action-btn-outline" onClick={handleExport}>
+                    Export Backup...
                   </Button>
                 </div>
-                
+
                 <div className="action-card">
                   <div className="action-card-header">
-                    <span className="material-symbols-outlined">download</span>
-                    <h4>Export Data</h4>
+                    <span className="material-symbols-outlined">upload</span>
+                    <h4>Restore Backup</h4>
                   </div>
-                  <p>Download all snippets as a JSON file.</p>
-                  <Button variant="secondary" className="action-btn-outline" onClick={() => {}}>
-                    Export to JSON
+                  <p>Import snippets from a YAML backup.</p>
+                  <Button variant="secondary" className="action-btn-danger" onClick={handleImport}>
+                    Restore Backup...
                   </Button>
                 </div>
-              </div>
-
-              <div className="settings-row settings-row-bordered pt-md">
-                <div className="settings-row-info">
-                  <h4>Restore Backup</h4>
-                  <p>Overwrite current data from a backup file.</p>
-                </div>
-                <Button variant="secondary" className="action-btn-danger" onClick={() => {}}>
-                  Restore...
-                </Button>
               </div>
             </div>
 

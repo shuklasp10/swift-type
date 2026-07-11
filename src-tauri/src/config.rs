@@ -1,5 +1,5 @@
 //! Configuration Module
-//! 
+//!
 //! Handles loading, saving, and managing snippets configuration.
 
 use serde::{Deserialize, Serialize};
@@ -12,57 +12,65 @@ pub struct Snippet {
     /// Unique identifier for this snippet
     #[serde(default = "generate_id")]
     pub id: String,
-    
+
     /// The trigger text (e.g., ":hello")
     #[serde(alias = "trigger")]
     pub trigger: Option<String>,
-    
+
     /// Regex trigger pattern (alternative to exact trigger)
     #[serde(alias = "regex")]
     pub regex: Option<String>,
-    
+
     /// The replacement text
     pub replace: String,
-    
+
     /// Optional label for display in UI
     #[serde(default)]
     pub label: Option<String>,
-    
+
     /// Word-based trigger (requires word boundary)
     #[serde(default)]
     pub word: bool,
-    
+
     /// Force uppercase matching
     #[serde(default)]
     pub uppercase_style: Option<String>,
-    
+
     /// Image path for image expansion
     #[serde(default)]
     pub image_path: Option<String>,
-    
+
     /// Shell command to execute
     #[serde(default)]
     pub shell: Option<String>,
-    
+
     /// Form fields for dynamic input
     #[serde(default)]
     pub form_fields: Option<Vec<FormField>>,
-    
+
     /// App-specific filter
     #[serde(default)]
     pub filter_app: Option<String>,
-    
+
     /// Category for organization
     #[serde(default)]
     pub category: Option<String>,
-    
+
     /// Usage count for tracking popularity
     #[serde(default)]
     pub usage_count: Option<u32>,
-    
+
     /// Last updated timestamp
     #[serde(default)]
     pub updated_at: Option<u64>,
+
+    /// Is favorite
+    #[serde(default)]
+    pub is_favorite: Option<bool>,
+
+    /// Deleted at timestamp (soft delete)
+    #[serde(default)]
+    pub deleted_at: Option<u64>,
 }
 
 /// Form field definition for dynamic snippets
@@ -97,7 +105,7 @@ pub struct Config {
     /// List of snippets/matches
     #[serde(default)]
     pub matches: Vec<Snippet>,
-    
+
     /// Global variables
     #[serde(default)]
     pub global_vars: HashMap<String, String>,
@@ -108,25 +116,25 @@ pub struct Config {
 pub struct AppSettings {
     /// Enable/disable the expander
     pub enabled: bool,
-    
+
     /// Injection method preference
     pub injection_method: String, // "auto", "keystrokes", "clipboard"
-    
+
     /// Search bar hotkey
     pub search_hotkey: String,
-    
+
     /// Backspace undo duration (ms)
     pub undo_backspace_ms: u32,
-    
+
     /// Start with Windows
     pub start_with_windows: bool,
-    
+
     /// Show in system tray
     pub show_in_tray: bool,
-    
+
     /// Theme preference
     pub theme: String, // "dark", "light", "system"
-    
+
     /// Toggle hotkey
     pub toggle_hotkey: Option<String>,
 }
@@ -157,29 +165,29 @@ impl ConfigManager {
     /// Create a new config manager
     pub fn new() -> Result<Self, String> {
         let config_dir = get_config_dir()?;
-        
+
         // Ensure config directory exists
         std::fs::create_dir_all(&config_dir)
             .map_err(|e| format!("Failed to create config directory: {}", e))?;
-        
+
         let mut manager = Self {
             config: Config::default(),
             settings: AppSettings::default(),
             config_dir,
         };
-        
+
         // Load existing config if available
         manager.load()?;
-        
+
         Ok(manager)
     }
-    
+
     /// Get the config directory path
     #[allow(dead_code)]
     pub fn config_dir(&self) -> &PathBuf {
         &self.config_dir
     }
-    
+
     /// Load configuration from disk
     pub fn load(&mut self) -> Result<(), String> {
         // Load snippets config
@@ -194,7 +202,7 @@ impl ConfigManager {
             self.config = create_default_config();
             self.save_config()?;
         }
-        
+
         // Load settings
         let settings_path = self.config_dir.join("settings.json");
         if settings_path.exists() {
@@ -205,11 +213,11 @@ impl ConfigManager {
         } else {
             self.save_settings()?;
         }
-        
+
         log::info!("Loaded {} snippets", self.config.matches.len());
         Ok(())
     }
-    
+
     /// Save snippets config to disk
     pub fn save_config(&self) -> Result<(), String> {
         let config_path = self.config_dir.join("config.yml");
@@ -219,7 +227,35 @@ impl ConfigManager {
             .map_err(|e| format!("Failed to write config file: {}", e))?;
         Ok(())
     }
-    
+
+    /// Export snippets config to a specific path
+    pub fn export_data(&self, path: &str) -> Result<(), String> {
+        let content = serde_yaml::to_string(&self.config)
+            .map_err(|e| format!("Failed to serialize config: {}", e))?;
+        std::fs::write(path, content)
+            .map_err(|e| format!("Failed to write export file: {}", e))?;
+        Ok(())
+    }
+
+    /// Import snippets config from a specific path
+    pub fn import_data(&mut self, path: &str, merge: bool) -> Result<(), String> {
+        let content = std::fs::read_to_string(path)
+            .map_err(|e| format!("Failed to read import file: {}", e))?;
+        let imported_config: Config = serde_yaml::from_str(&content)
+            .map_err(|e| format!("Failed to parse imported config: {}", e))?;
+        
+        if merge {
+            for snippet in imported_config.matches {
+                if !self.config.matches.iter().any(|s| s.id == snippet.id) {
+                    self.config.matches.push(snippet);
+                }
+            }
+        } else {
+            self.config = imported_config;
+        }
+        self.save_config()
+    }
+
     /// Save settings to disk
     pub fn save_settings(&self) -> Result<(), String> {
         let settings_path = self.config_dir.join("settings.json");
@@ -229,33 +265,33 @@ impl ConfigManager {
             .map_err(|e| format!("Failed to write settings file: {}", e))?;
         Ok(())
     }
-    
+
     /// Get all snippets
     pub fn snippets(&self) -> &[Snippet] {
         &self.config.matches
     }
-    
+
     /// Get snippets as mutable
     #[allow(dead_code)]
     pub fn snippets_mut(&mut self) -> &mut Vec<Snippet> {
         &mut self.config.matches
     }
-    
+
     /// Get settings
     pub fn settings(&self) -> &AppSettings {
         &self.settings
     }
-    
+
     /// Get settings as mutable
     pub fn settings_mut(&mut self) -> &mut AppSettings {
         &mut self.settings
     }
-    
+
     /// Add a new snippet
     pub fn add_snippet(&mut self, snippet: Snippet) {
         self.config.matches.push(snippet);
     }
-    
+
     /// Remove a snippet by ID
     pub fn remove_snippet(&mut self, id: &str) -> bool {
         if let Some(pos) = self.config.matches.iter().position(|s| s.id == id) {
@@ -265,7 +301,7 @@ impl ConfigManager {
             false
         }
     }
-    
+
     /// Update a snippet by ID
     pub fn update_snippet(&mut self, id: &str, snippet: Snippet) -> bool {
         if let Some(existing) = self.config.matches.iter_mut().find(|s| s.id == id) {
@@ -275,7 +311,22 @@ impl ConfigManager {
             false
         }
     }
-    
+
+    /// Increment usage count for a snippet
+    pub fn increment_usage(&mut self, id: &str) -> Result<(), String> {
+        if let Some(existing) = self.config.matches.iter_mut().find(|s| s.id == id) {
+            existing.usage_count = Some(existing.usage_count.unwrap_or(0) + 1);
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            existing.updated_at = Some(now);
+            self.save_config()
+        } else {
+            Err(format!("Snippet not found: {}", id))
+        }
+    }
+
     /// Find a snippet that matches the given buffer
     #[allow(dead_code)]
     pub fn find_matching_snippet(&self, buffer: &str) -> Option<&Snippet> {
@@ -318,6 +369,8 @@ fn create_default_config() -> Config {
                 category: Some("General".to_string()),
                 usage_count: Some(42),
                 updated_at: Some(1715424000), // Arbitrary past timestamp
+                is_favorite: None,
+                deleted_at: None,
             },
             Snippet {
                 id: "example_date".to_string(),
@@ -334,6 +387,8 @@ fn create_default_config() -> Config {
                 category: Some("Development".to_string()),
                 usage_count: Some(15),
                 updated_at: Some(1715424000),
+                is_favorite: None,
+                deleted_at: None,
             },
             Snippet {
                 id: "example_email".to_string(),
@@ -350,6 +405,8 @@ fn create_default_config() -> Config {
                 category: Some("Communication".to_string()),
                 usage_count: Some(89),
                 updated_at: Some(1715424000),
+                is_favorite: None,
+                deleted_at: None,
             },
         ],
         global_vars: HashMap::new(),

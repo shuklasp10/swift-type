@@ -13,6 +13,8 @@ export interface Snippet {
   category?: string | null;
   usage_count?: number | null;
   updated_at?: number | null;
+  is_favorite?: boolean | null;
+  deleted_at?: number | null;
 }
 
 export interface FormField {
@@ -40,13 +42,16 @@ export interface EngineStatus {
 }
 
 export interface SnippetsViewProps {
+  activeTab: string;
   snippets: Snippet[];
   onEdit: (snippet: Snippet) => void;
   onDelete: (id: string) => void;
+  onUpdate: (id: string, snippet: Snippet) => void;
 }
 
 export interface SnippetEditorProps {
   snippet: Snippet | null;
+  existingCategories: string[];
   onSave: (snippet: Snippet) => void;
   onClose: () => void;
 }
@@ -57,8 +62,9 @@ export interface SettingsViewProps {
 }
 
 export interface SidebarProps {
-  activeTab: "snippets" | "settings" | "editor";
-  setActiveTab: (tab: "snippets" | "settings" | "editor") => void;
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+  snippets: Snippet[];
   onNewSnippet: () => void;
 }
 

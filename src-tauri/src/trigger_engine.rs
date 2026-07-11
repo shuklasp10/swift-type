@@ -1,12 +1,12 @@
 //! Trigger Engine Module
-//! 
+//!
 //! Handles trigger detection, variable expansion, and text replacement coordination.
 
 use chrono::Local;
+use parking_lot::RwLock;
 use regex::Regex;
 use std::collections::HashMap;
 use std::sync::Arc;
-use parking_lot::RwLock;
 
 use crate::config::ConfigManager;
 use crate::text_injector::{replace_text, InjectionMethod};
@@ -30,7 +30,7 @@ impl TriggerEngine {
                 _ => InjectionMethod::Auto,
             }
         };
-        
+
         Self {
             config,
             regex_cache: HashMap::new(),
@@ -38,33 +38,36 @@ impl TriggerEngine {
             enabled: true,
         }
     }
-    
+
     /// Enable or disable the engine
     pub fn set_enabled(&mut self, enabled: bool) {
         self.enabled = enabled;
     }
-    
+
     /// Check if engine is enabled
     pub fn is_enabled(&self) -> bool {
         self.enabled
     }
-    
+
     /// Set injection method
     #[allow(dead_code)]
     pub fn set_injection_method(&mut self, method: InjectionMethod) {
         self.injection_method = method;
     }
-    
+
     /// Process a keystroke buffer and check for triggers
     pub fn process_buffer(&mut self, buffer: &str) -> Option<ExpansionResult> {
         if !self.enabled {
             return None;
         }
-        
+
         // Collect matching info first to avoid borrow issues
-        let _match_info: Option<(Option<(String, usize)>, Option<(String, String, String, bool)>)> = {
+        let _match_info: Option<(
+            Option<(String, usize)>,
+            Option<(String, String, String, bool)>,
+        )> = {
             let config = self.config.read();
-            
+
             for snippet in config.snippets() {
                 // Check exact trigger
                 if let Some(ref trigger) = snippet.trigger {
@@ -77,7 +80,7 @@ impl TriggerEngine {
                         });
                     }
                 }
-                
+
                 // Check regex trigger - collect data for later processing
                 if let Some(ref regex_pattern) = snippet.regex {
                     // Clone what we need to check regex outside the config borrow
@@ -86,11 +89,17 @@ impl TriggerEngine {
                     let snip_id = snippet.id.clone();
                     let has_form = snippet.form_fields.is_some();
                     drop(config);
-                    
-                    if let Some(result) = self.check_regex_trigger(buffer, &pattern, &replace_text, &snip_id, has_form) {
+
+                    if let Some(result) = self.check_regex_trigger(
+                        buffer,
+                        &pattern,
+                        &replace_text,
+                        &snip_id,
+                        has_form,
+                    ) {
                         return Some(result);
                     }
-                    
+
                     // Re-acquire config for next iteration
                     // But since we found no match, continue checking
                     // For simplicity, just return None here and let caller retry
@@ -99,15 +108,15 @@ impl TriggerEngine {
             }
             None
         };
-        
+
         None
     }
-    
+
     /// Check for regex trigger match
     fn check_regex_trigger(
-        &mut self, 
-        buffer: &str, 
-        pattern: &str, 
+        &mut self,
+        buffer: &str,
+        pattern: &str,
         replace_text: &str,
         snippet_id: &str,
         has_form: bool,
@@ -127,14 +136,14 @@ impl TriggerEngine {
                 }
             }
         };
-        
+
         // Check if buffer ends with a match
         if let Some(mat) = regex.find(buffer) {
             if mat.end() == buffer.len() {
                 let matched_text = mat.as_str();
                 let replacement = regex.replace(matched_text, replace_text);
                 let replacement = self.expand_variables(&replacement);
-                
+
                 return Some(ExpansionResult {
                     trigger_len: matched_text.len(),
                     replacement,
@@ -143,16 +152,16 @@ impl TriggerEngine {
                 });
             }
         }
-        
+
         None
     }
-    
+
     /// Expand built-in variables in replacement text
     fn expand_variables(&self, text: &str) -> String {
         let now = Local::now();
-        
+
         let mut result = text.to_string();
-        
+
         // Date/time variables
         result = result.replace("{{date}}", &now.format("%Y-%m-%d").to_string());
         result = result.replace("{{time}}", &now.format("%H:%M:%S").to_string());
@@ -163,13 +172,13 @@ impl TriggerEngine {
         result = result.replace("{{hour}}", &now.format("%H").to_string());
         result = result.replace("{{minute}}", &now.format("%M").to_string());
         result = result.replace("{{second}}", &now.format("%S").to_string());
-        
+
         // Day names
         result = result.replace("{{weekday}}", &now.format("%A").to_string());
         result = result.replace("{{weekday_short}}", &now.format("%a").to_string());
         result = result.replace("{{month_name}}", &now.format("%B").to_string());
         result = result.replace("{{month_short}}", &now.format("%b").to_string());
-        
+
         // Clipboard (if requested)
         if result.contains("{{clipboard}}") {
             if let Some(clip_text) = get_clipboard_text() {
@@ -178,14 +187,25 @@ impl TriggerEngine {
                 result = result.replace("{{clipboard}}", "");
             }
         }
-        
+
         result
     }
-    
+
     /// Execute the expansion
     pub fn execute_expansion(&self, result: &ExpansionResult) -> Result<(), String> {
-        replace_text(result.trigger_len, &result.replacement, self.injection_method)?;
+        replace_text(
+            result.trigger_len,
+            &result.replacement,
+            self.injection_method,
+        )?;
         log::info!("Expanded snippet: {}", result.snippet_id);
+
+        // Increment usage count
+        let mut cfg = self.config.write();
+        if let Err(e) = cfg.increment_usage(&result.snippet_id) {
+            log::warn!("Failed to increment usage stats: {}", e);
+        }
+
         Ok(())
     }
 }
@@ -205,15 +225,15 @@ pub struct ExpansionResult {
 
 /// Get text from clipboard
 fn get_clipboard_text() -> Option<String> {
-    use windows::Win32::System::DataExchange::{OpenClipboard, CloseClipboard, GetClipboardData};
+    use windows::Win32::Foundation::{HGLOBAL, HWND};
+    use windows::Win32::System::DataExchange::{CloseClipboard, GetClipboardData, OpenClipboard};
     use windows::Win32::System::Memory::{GlobalLock, GlobalUnlock};
-    use windows::Win32::Foundation::{HWND, HGLOBAL};
-    
+
     unsafe {
         if OpenClipboard(HWND::default()).is_err() {
             return None;
         }
-        
+
         // CF_UNICODETEXT = 13
         let handle = match GetClipboardData(13) {
             Ok(h) => h,
@@ -222,29 +242,29 @@ fn get_clipboard_text() -> Option<String> {
                 return None;
             }
         };
-        
+
         // Convert HANDLE to HGLOBAL
         let hglobal = HGLOBAL(handle.0);
-        
+
         let ptr = GlobalLock(hglobal);
         if ptr.is_null() {
             let _ = CloseClipboard();
             return None;
         }
-        
+
         // Read UTF-16 string
         let mut len = 0;
         let wptr = ptr as *const u16;
         while *wptr.add(len) != 0 {
             len += 1;
         }
-        
+
         let slice = std::slice::from_raw_parts(wptr, len);
         let text = String::from_utf16_lossy(slice);
-        
+
         let _ = GlobalUnlock(hglobal);
         let _ = CloseClipboard();
-        
+
         Some(text)
     }
 }

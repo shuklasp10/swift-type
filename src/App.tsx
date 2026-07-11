@@ -12,12 +12,14 @@ import { Toggle } from "./components/ui/Toggle";
 
 // Main App Component
 function App() {
-  const [activeTab, setActiveTab] = useState<"snippets" | "settings" | "editor">("snippets");
+  const [activeTab, setActiveTab] = useState<string>("snippets");
   const [snippets, setSnippets] = useState<Snippet[]>([]);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [engineStatus, setEngineStatus] = useState<EngineStatus | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [editingSnippet, setEditingSnippet] = useState<Snippet | null>(null);
+
+  const existingCategories = Array.from(new Set(snippets.filter(s => !s.deleted_at).map(s => s.category || "General"))).sort();
 
   // Load data on mount
   useEffect(() => {
@@ -94,9 +96,26 @@ function App() {
     }
   };
 
+  const handleUpdateSnippet = async (id: string, snippet: Snippet) => {
+    try {
+      await invoke("update_snippet", { id, snippet });
+      await loadData();
+    } catch (err) {
+      console.error("Failed to update snippet:", err);
+    }
+  };
+
   const handleDeleteSnippet = async (id: string) => {
     try {
-      await invoke("delete_snippet", { id });
+      const snippet = snippets.find(s => s.id === id);
+      if (snippet && !snippet.deleted_at && activeTab !== "trash") {
+        // Soft delete
+        const updated = { ...snippet, deleted_at: Date.now() };
+        await invoke("update_snippet", { id, snippet: updated });
+      } else {
+        // Hard delete
+        await invoke("delete_snippet", { id });
+      }
       await loadData();
     } catch (err) {
       console.error("Failed to delete snippet:", err);
@@ -119,6 +138,7 @@ function App() {
       <Sidebar 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
+        snippets={snippets}
         onNewSnippet={handleNewSnippet}
       />
 
@@ -155,11 +175,13 @@ function App() {
           </div>
         </header>
 
-        {activeTab === "snippets" && (
+        {(activeTab === "snippets" || activeTab === "favorites" || activeTab === "trash" || activeTab.startsWith("collection:")) && (
           <SnippetsView
+            activeTab={activeTab}
             snippets={snippets}
             onEdit={handleEditSnippet}
             onDelete={handleDeleteSnippet}
+            onUpdate={handleUpdateSnippet}
           />
         )}
         
@@ -170,6 +192,7 @@ function App() {
         {activeTab === "editor" && (
           <SnippetEditor
             snippet={editingSnippet}
+            existingCategories={existingCategories}
             onSave={handleSaveSnippet}
             onClose={() => {
               setActiveTab("snippets");

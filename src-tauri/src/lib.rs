@@ -1,23 +1,23 @@
 //! SwiftType - A Modern Text Expander
-//! 
+//!
 //! Main library entry point that wires up the Tauri application
 //! with the text expansion engine.
 
+mod config;
 mod keyboard_hook;
 mod text_injector;
-mod config;
 mod trigger_engine;
 
-use std::sync::mpsc;
-use std::thread;
-use std::sync::Arc;
 use parking_lot::RwLock;
-use tauri::{Manager, State};
-use tauri::tray::{TrayIconBuilder, MouseButton, MouseButtonState, TrayIconEvent};
-use tauri::menu::{Menu, MenuItem};
 use serde::Serialize;
+use std::sync::mpsc;
+use std::sync::Arc;
+use std::thread;
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{Manager, State};
 
-use config::{ConfigManager, Snippet, AppSettings};
+use config::{AppSettings, ConfigManager, Snippet};
 use trigger_engine::TriggerEngine;
 
 /// Application state shared across commands
@@ -68,6 +68,20 @@ fn delete_snippet(state: State<AppState>, id: String) -> Result<bool, String> {
     Ok(deleted)
 }
 
+/// Export snippets to a YAML file
+#[tauri::command]
+fn export_snippets(state: State<AppState>, path: String) -> Result<(), String> {
+    let config = state.config.read();
+    config.export_data(&path)
+}
+
+/// Import snippets from a YAML file
+#[tauri::command]
+fn import_snippets(state: State<AppState>, path: String, merge: bool) -> Result<(), String> {
+    let mut config = state.config.write();
+    config.import_data(&path, merge)
+}
+
 // ============================================================================
 // Tauri Commands - Settings
 // ============================================================================
@@ -80,10 +94,28 @@ fn get_settings(state: State<AppState>) -> AppSettings {
 
 /// Update application settings
 #[tauri::command]
-fn update_settings(state: State<AppState>, settings: AppSettings) -> Result<(), String> {
+fn update_settings(
+    app: tauri::AppHandle,
+    state: State<AppState>,
+    settings: AppSettings,
+) -> Result<(), String> {
     let mut config = state.config.write();
+    let old_start = config.settings().start_with_windows;
+    let new_start = settings.start_with_windows;
+
     *config.settings_mut() = settings;
     config.save_settings()?;
+
+    if old_start != new_start {
+        use tauri_plugin_autostart::ManagerExt;
+        let autostart = app.autolaunch();
+        if new_start {
+            let _ = autostart.enable();
+        } else {
+            let _ = autostart.disable();
+        }
+    }
+
     Ok(())
 }
 
@@ -106,11 +138,11 @@ fn get_engine_status(state: State<AppState>) -> EngineStatus {
 fn toggle_engine(state: State<AppState>, enabled: bool) -> Result<(), String> {
     let mut engine = state.engine.write();
     engine.set_enabled(enabled);
-    
+
     if enabled && !keyboard_hook::is_hook_installed() {
         keyboard_hook::install_hook()?;
     }
-    
+
     Ok(())
 }
 
@@ -141,8 +173,9 @@ struct EngineStatus {
 fn search_snippets(state: State<AppState>, query: String) -> Vec<Snippet> {
     let config = state.config.read();
     let query_lower = query.to_lowercase();
-    
-    config.snippets()
+
+    config
+        .snippets()
         .iter()
         .filter(|s| {
             if let Some(ref trigger) = s.trigger {
@@ -170,34 +203,38 @@ fn spawn_worker_thread(
     shared_buffer: Arc<RwLock<String>>,
 ) -> Result<(), &'static str> {
     let (tx, rx) = mpsc::channel();
-    
+
     keyboard_hook::set_event_sender(tx)?;
-    
+
     thread::spawn(move || {
         for event in rx {
             let mut current_buffer = shared_buffer.write();
-            
+
             match event {
                 keyboard_hook::HookEvent::Char(c) => {
-                    current_buffer.push(c);
-                    // Prevent buffer from growing unbounded
-                    if current_buffer.len() > 256 {
-                        let drain_count = current_buffer.len() - 128;
-                        current_buffer.drain(..drain_count);
+                    if !keyboard_hook::is_injecting() {
+                        current_buffer.push(c);
+                        // Prevent buffer from growing unbounded
+                        if current_buffer.len() > 256 {
+                            let drain_count = current_buffer.len() - 128;
+                            current_buffer.drain(..drain_count);
+                        }
                     }
                 }
                 keyboard_hook::HookEvent::Backspace => {
-                    current_buffer.pop();
+                    if !keyboard_hook::is_injecting() {
+                        current_buffer.pop();
+                    }
                 }
                 keyboard_hook::HookEvent::Clear => {
                     current_buffer.clear();
                 }
             }
-            
+
             // Clone buffer and release lock before evaluating triggers
             let buffer_content = current_buffer.clone();
             drop(current_buffer);
-            
+
             let mut eng = engine.write();
             if let Some(result) = eng.process_buffer(&buffer_content) {
                 if !result.has_form {
@@ -208,22 +245,20 @@ fn spawn_worker_thread(
                         shared_buffer.write().clear();
                     }
                 }
-                // TODO: Handle form-based snippets by emitting event to frontend
             }
         }
     });
-    
+
     Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Initialize logger
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
-        .init();
-    
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+
     log::info!("Starting SwiftType...");
-    
+
     // Initialize configuration
     let config = match ConfigManager::new() {
         Ok(cfg) => Arc::new(RwLock::new(cfg)),
@@ -233,25 +268,34 @@ pub fn run() {
             return;
         }
     };
-    
+
     // Initialize trigger engine
     let engine = Arc::new(RwLock::new(TriggerEngine::new(config.clone())));
-    
+
     let shared_buffer = Arc::new(RwLock::new(String::with_capacity(256)));
-    
+
     // Set up background worker
     if let Err(e) = spawn_worker_thread(engine.clone(), shared_buffer.clone()) {
         log::error!("Failed to spawn worker thread: {}", e);
     }
-    
+
     // Install keyboard hook
     if let Err(e) = keyboard_hook::install_hook() {
         log::error!("Failed to install keyboard hook: {}", e);
     }
-    
-    let app_state = AppState { config, engine, keystroke_buffer: shared_buffer };
-    
+
+    let app_state = AppState {
+        config,
+        engine,
+        keystroke_buffer: shared_buffer,
+    };
+
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec![]),
+        ))
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
@@ -274,7 +318,12 @@ pub fn run() {
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
                         if let Some(window) = tray.app_handle().get_webview_window("main") {
                             let _ = window.show();
                             let _ = window.set_focus();
@@ -282,6 +331,13 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+
+            // Always show the main window on startup
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+
             Ok(())
         })
         .manage(app_state)
@@ -292,6 +348,8 @@ pub fn run() {
             update_snippet,
             delete_snippet,
             search_snippets,
+            export_snippets,
+            import_snippets,
             // Settings
             get_settings,
             update_settings,

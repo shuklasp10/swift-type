@@ -1,9 +1,48 @@
+import { useState, useMemo } from "react";
 import { SnippetsViewProps } from "../../types";
-import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
 
-export function SnippetsView({ snippets, onEdit }: SnippetsViewProps) {
-  
+export function SnippetsView({ activeTab, snippets, onEdit, onDelete, onUpdate }: SnippetsViewProps) {
+  const [sortBy, setSortBy] = useState<"name-asc" | "name-desc" | "usage-desc" | "updated-desc">("updated-desc");
+  const [filterCategory, setFilterCategory] = useState<string>("All");
+
+  const categories = useMemo(() => {
+    const cats = new Set(snippets.filter(s => !s.deleted_at).map(s => s.category || "General"));
+    return ["All", ...Array.from(cats).sort()];
+  }, [snippets]);
+
+  const filteredAndSortedSnippets = useMemo(() => {
+    let filtered = snippets.filter(s => {
+      if (activeTab === "trash") return !!s.deleted_at;
+      if (activeTab === "favorites") return s.is_favorite && !s.deleted_at;
+      if (activeTab.startsWith("collection:")) {
+        const col = activeTab.split(":")[1];
+        const snippetCat = s.category || "General";
+        return snippetCat === col && !s.deleted_at;
+      }
+      return !s.deleted_at;
+    });
+
+    if (filterCategory !== "All") {
+      filtered = filtered.filter(s => (s.category || "General") === filterCategory);
+    }
+
+    return filtered.sort((a, b) => {
+      switch (sortBy) {
+        case "name-asc":
+          return (a.label || a.id).localeCompare(b.label || b.id);
+        case "name-desc":
+          return (b.label || b.id).localeCompare(a.label || a.id);
+        case "usage-desc":
+          return (b.usage_count || 0) - (a.usage_count || 0);
+        case "updated-desc":
+          return (b.updated_at || 0) - (a.updated_at || 0);
+        default:
+          return 0;
+      }
+    });
+  }, [snippets, activeTab, filterCategory, sortBy]);
+
   const getCategoryClass = (category?: string | null) => {
     switch (category?.toLowerCase()) {
       case 'communication': return 'category-communication';
@@ -21,30 +60,58 @@ export function SnippetsView({ snippets, onEdit }: SnippetsViewProps) {
     return `${Math.floor(seconds / 86400)}d ago`;
   };
 
+  let title = "All Snippets";
+  let description = "Manage and organize your reusable text blocks.";
+  if (activeTab === "favorites") {
+    title = "Favorites";
+    description = "Your starred and most important snippets.";
+  } else if (activeTab === "trash") {
+    title = "Trash";
+    description = "Deleted snippets. They will be permanently removed eventually.";
+  } else if (activeTab.startsWith("collection:")) {
+    title = activeTab.split(":")[1];
+    description = `Snippets in the ${title} collection.`;
+  }
+
+  // Hide the category filter if we are inside a collection
+  const showCategoryFilter = !activeTab.startsWith("collection:");
+
   return (
     <>
       <div className="content-area content-area-padded">
         <div className="view-header">
           <div>
-            <h2 className="header-title">All Snippets</h2>
-            <p className="view-description">
-              Manage and organize your reusable text blocks.
-            </p>
+            <h2 className="header-title">{title}</h2>
+            <p className="view-description">{description}</p>
           </div>
-          <div className="view-actions">
-            <Button variant="secondary" icon={<span className="material-symbols-outlined icon-sm">filter_list</span>}>
-              Filter
-            </Button>
-            <Button variant="secondary" icon={<span className="material-symbols-outlined icon-sm">sort</span>}>
-              Sort
-            </Button>
+          <div className="view-actions" style={{ display: 'flex', gap: '8px' }}>
+            {showCategoryFilter && (
+              <select 
+                value={filterCategory} 
+                onChange={e => setFilterCategory(e.target.value)}
+                className="form-input"
+                style={{ width: 'auto', minWidth: '120px', padding: '4px 8px', fontSize: '13px', height: '32px' }}
+              >
+                {categories.map(cat => <option key={cat} value={cat}>{cat === "All" ? "All Categories" : cat}</option>)}
+              </select>
+            )}
+            <select 
+              value={sortBy} 
+              onChange={e => setSortBy(e.target.value as any)}
+              className="form-input"
+              style={{ width: 'auto', minWidth: '120px', padding: '4px 8px', fontSize: '13px', height: '32px' }}
+            >
+              <option value="updated-desc">Recently Updated</option>
+              <option value="usage-desc">Most Used</option>
+              <option value="name-asc">Name (A-Z)</option>
+              <option value="name-desc">Name (Z-A)</option>
+            </select>
           </div>
         </div>
 
-        {/* Snippets Grid */}
-        {snippets.length > 0 ? (
+        {filteredAndSortedSnippets.length > 0 ? (
           <div className="snippet-grid snippet-grid-mt">
-            {snippets.map((snippet) => (
+            {filteredAndSortedSnippets.map((snippet) => (
               <div
                 key={snippet.id}
                 className="snippet-card"
@@ -57,20 +124,41 @@ export function SnippetsView({ snippets, onEdit }: SnippetsViewProps) {
                     {snippet.label || snippet.id}
                   </h3>
                   <div className="snippet-card-actions">
-                    <IconButton
-                      icon={<span className="material-symbols-outlined icon-sm">star</span>}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        // Favorite toggle logic can be added here
-                      }}
-                    />
-                    <IconButton
-                      icon={<span className="material-symbols-outlined icon-sm">content_copy</span>}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigator.clipboard.writeText(snippet.replace);
-                      }}
-                    />
+                    {activeTab === "trash" ? (
+                      <>
+                        <IconButton
+                          icon={<span className="material-symbols-outlined icon-sm">restore</span>}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onUpdate(snippet.id, { ...snippet, deleted_at: null });
+                          }}
+                        />
+                        <IconButton
+                          icon={<span className="material-symbols-outlined icon-sm">delete_forever</span>}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(snippet.id);
+                          }}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <IconButton
+                          icon={<span className="material-symbols-outlined icon-sm" style={{ color: snippet.is_favorite ? '#eab308' : 'inherit' }}>{snippet.is_favorite ? 'star' : 'star_border'}</span>}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onUpdate(snippet.id, { ...snippet, is_favorite: !snippet.is_favorite });
+                          }}
+                        />
+                        <IconButton
+                          icon={<span className="material-symbols-outlined icon-sm">delete</span>}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(snippet.id);
+                          }}
+                        />
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -100,9 +188,13 @@ export function SnippetsView({ snippets, onEdit }: SnippetsViewProps) {
             <div className="empty-state-icon">
               <span className="material-symbols-outlined icon-lg">dataset</span>
             </div>
-            <h3 className="empty-state-title">No snippets yet</h3>
+            <h3 className="empty-state-title">No snippets found</h3>
             <p className="empty-state-text">
-              Create your first snippet to start expanding text automatically
+              {activeTab === "trash" 
+                ? "Your trash is empty." 
+                : activeTab === "favorites" 
+                  ? "You haven't starred any snippets yet."
+                  : "Create your first snippet to get started."}
             </p>
           </div>
         )}
