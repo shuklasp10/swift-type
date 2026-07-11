@@ -78,9 +78,9 @@
 .category-development { --cat-color: rgb(0, 103, 192); --cat-bg: rgb(229, 240, 249); }
 .category-general { --cat-color: rgb(0, 103, 192); --cat-bg: rgb(229, 240, 249); }
 
-[data-theme="dark"] .category-communication { --cat-color: rgb(0, 103, 192); --cat-bg: rgba(103, 149, 201, 0.2); }
-[data-theme="dark"] .category-development { --cat-color: rgb(0, 103, 192); --cat-bg: rgba(103, 149, 201, 0.2); }
-[data-theme="dark"] .category-general { --cat-color: rgb(0, 103, 192); --cat-bg: rgba(103, 149, 201, 0.2); }
+[data-theme="dark"] .category-communication { --cat-color: rgb(140, 190, 255); --cat-bg: rgba(103, 149, 201, 0.2); }
+[data-theme="dark"] .category-development { --cat-color: rgb(140, 190, 255); --cat-bg: rgba(103, 149, 201, 0.2); }
+[data-theme="dark"] .category-general { --cat-color: rgb(140, 190, 255); --cat-bg: rgba(103, 149, 201, 0.2); }
 
 .tag-chip {
   padding: 2px 8px;
