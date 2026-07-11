@@ -17,6 +17,12 @@ A modern, lightweight text expander for Windows. Alternative to Espanso with a b
 
 ## Installation
 
+> **Note on Windows Defender SmartScreen:** 
+> Because SwiftType is currently an unsigned indie application, Windows Defender SmartScreen will likely show a warning when you run the installer ("Windows protected your PC"). 
+> This is normal for new/unsigned apps. To proceed with the installation:
+> 1. Click **"More info"** on the blue warning screen.
+> 2. Click **"Run anyway"**.
+
 ### Prerequisites
 
 - [Rust](https://rustup.rs/) 1.70+
