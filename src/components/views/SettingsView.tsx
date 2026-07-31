@@ -139,7 +139,7 @@ export function SettingsView({ settings, onSave }: SettingsViewProps) {
               <div className="settings-row">
                 <div className="settings-row-info">
                   <h4>Launch at Startup</h4>
-                  <p>Automatically open SnippetFlow when you log in.</p>
+                  <p>Start SwiftType in the system tray when you log in.</p>
                 </div>
                 <Toggle
                   active={localSettings.start_with_windows}

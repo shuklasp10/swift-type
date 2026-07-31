@@ -298,10 +298,18 @@ pub fn run() {
     };
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            // A second instance was launched — focus the existing window instead
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            Some(vec![]),
+            Some(vec!["--autostart".into()]),
         ))
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
@@ -339,10 +347,14 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            // Always show the main window on startup
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.set_focus();
+            // Only show the main window if NOT launched via autostart.
+            // When autostarted, the app stays silently in the system tray.
+            let is_autostart = std::env::args().any(|a| a == "--autostart");
+            if !is_autostart {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
             }
 
             Ok(())
