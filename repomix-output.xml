@@ -578,98 +578,6 @@ body {
 }
 </file>
 
-<file path="src/styles/forms.css">
-/* Form Elements */
-.form-group {
-  margin-bottom: var(--space-md);
-}
-
-.form-label {
-  display: block;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-primary);
-  margin-bottom: var(--space-xs);
-}
-
-.form-input {
-  width: 100%;
-  padding: var(--space-sm) var(--space-md);
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: 0.875rem;
-  transition: all var(--transition-fast);
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: var(--border-active);
-  box-shadow: 0 0 0 1px var(--border-active);
-}
-
-.form-textarea {
-  min-height: 100px;
-  resize: vertical;
-  font-family: var(--font-mono);
-}
-
-.form-group-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  margin-bottom: var(--space-sm);
-}
-
-.mb-0 {
-  margin-bottom: 0 !important;
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-}
-
-.font-mono {
-  font-family: var(--font-mono);
-}
-
-.form-hint {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  margin-top: var(--space-xs);
-}
-
-.form-input-error {
-  border-color: var(--error-color) !important;
-}
-
-.form-input-error:focus {
-  box-shadow: 0 0 0 1px var(--error-color) !important;
-}
-
-.form-error {
-  font-size: 0.8rem;
-  color: var(--error-color);
-  margin-top: 6px;
-  display: flex;
-  align-items: flex-start;
-  gap: 4px;
-  line-height: 1.4;
-}
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-md);
-  margin-top: var(--space-xl);
-}
-</file>
-
 <file path="src/styles/Sidebar.css">
 /* Sidebar */
 .sidebar {
@@ -1075,6 +983,11 @@ export default defineConfig(async () => ({
 <file path="CHANGELOG.md">
 # Changelog
 
+## [0.1.1-alpha.2] - 2026-07-31
+
+- feat: add frontend snippet validation and prefix collision detection
+- feat: enforce single app instance and start autostarted app in system tray
+
 ## [0.1.1-alpha.1] - 2026-07-11
 
 - fix: use Tauri confirm dialog for snippet import to fix IPC serialization error
@@ -1243,305 +1156,95 @@ MIT License
 }
 </file>
 
-<file path="src/components/modals/SnippetEditor.tsx">
-import React, { useState, useMemo } from "react";
-import { Snippet, SnippetEditorProps } from "../../types";
-import { Button } from "../ui/Button";
-
-
-interface ValidationErrors {
-  trigger?: string;
-  replace?: string;
+<file path="src/styles/forms.css">
+/* Form Elements */
+.form-group {
+  margin-bottom: var(--space-md);
 }
 
-export function SnippetEditor({ snippet, existingCategories, existingSnippets, onSave, onClose }: SnippetEditorProps) {
-  const [trigger, setTrigger] = useState(snippet?.trigger || "");
-  const [replace, setReplace] = useState(snippet?.replace || "");
-  const [label, setLabel] = useState(snippet?.label || "");
-  const [useRegex, setUseRegex] = useState(!!snippet?.regex);
-  const [regex, setRegex] = useState(snippet?.regex || "");
-  const [category, setCategory] = useState(snippet?.category || "");
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [filterApp, setFilterApp] = useState(snippet?.filter_app || "");
-  const [shellCmd, setShellCmd] = useState(snippet?.shell || "");
-  const [imagePath, setImagePath] = useState(snippet?.image_path || "");
-  const [matchWord, setMatchWord] = useState(!!snippet?.word);
-  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
+.form-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: var(--space-xs);
+}
 
-  // Get triggers from other snippets (exclude self when editing, exclude deleted)
-  const otherTriggers = useMemo(() => {
-    return existingSnippets
-      .filter(s => !s.deleted_at && s.trigger && s.id !== snippet?.id)
-      .map(s => ({ trigger: s.trigger!, label: s.label }));
-  }, [existingSnippets, snippet?.id]);
+.form-input {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  transition: all var(--transition-fast);
+}
 
-  // Validate the form and return errors
-  const errors = useMemo((): ValidationErrors => {
-    const errs: ValidationErrors = {};
+.form-input:focus {
+  outline: none;
+  border-color: var(--border-active);
+  box-shadow: 0 0 0 1px var(--border-active);
+}
 
-    if (useRegex) {
-      // Regex validation
-      if (!regex.trim()) {
-        errs.trigger = "Regex pattern is required.";
-      } else {
-        try {
-          new RegExp(regex);
-        } catch {
-          errs.trigger = "Invalid regex syntax.";
-        }
-      }
-    } else {
-      // Trigger validation
-      if (!trigger.trim()) {
-        errs.trigger = "Trigger is required.";
-      } else {
-        // Check for exact duplicate
-        const duplicate = otherTriggers.find(t => t.trigger === trigger);
-        if (duplicate) {
-          const name = duplicate.label ? `"${duplicate.label}"` : `"${duplicate.trigger}"`;
-          errs.trigger = `This trigger already exists in snippet ${name}.`;
-        } else {
-          // Check for prefix collisions
-          // Case 1: An existing trigger is a prefix of the new one
-          // e.g., existing ":mail" would fire before user can finish typing ":mail2"
-          const blockedBy = otherTriggers.find(t => trigger.startsWith(t.trigger) && trigger !== t.trigger);
-          if (blockedBy) {
-            const name = blockedBy.label ? `"${blockedBy.label}"` : `"${blockedBy.trigger}"`;
-            errs.trigger = `Conflict: existing snippet ${name} with trigger "${blockedBy.trigger}" will fire before you can finish typing this trigger.`;
-          }
+.form-textarea {
+  min-height: 100px;
+  resize: vertical;
+  font-family: var(--font-mono);
+}
 
-          // Case 2: The new trigger is a prefix of an existing one
-          // e.g., adding ":mail" would prevent ":mail2" from ever being reached
-          const blocks = otherTriggers.find(t => t.trigger.startsWith(trigger) && t.trigger !== trigger);
-          if (!errs.trigger && blocks) {
-            const name = blocks.label ? `"${blocks.label}"` : `"${blocks.trigger}"`;
-            errs.trigger = `Conflict: this trigger will fire before the user can finish typing "${blocks.trigger}" (snippet ${name}).`;
-          }
-        }
-      }
-    }
+.form-group-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-sm);
+}
 
-    // Replacement text validation
-    if (!replace.trim()) {
-      errs.replace = "Replacement text is required.";
-    }
+.mb-0 {
+  margin-bottom: 0 !important;
+}
 
-    return errs;
-  }, [trigger, regex, replace, useRegex, otherTriggers]);
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
 
-  const hasErrors = Object.keys(errors).length > 0;
+.font-mono {
+  font-family: var(--font-mono);
+}
 
-  const insertVariable = (variable: string) => {
-    setReplace((prev) => prev + variable);
-  };
+.form-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: var(--space-xs);
+}
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setHasAttemptedSubmit(true);
+.form-input-error {
+  border-color: var(--error-color) !important;
+}
 
-    if (hasErrors) {
-      return;
-    }
+.form-input-error:focus {
+  box-shadow: 0 0 0 1px var(--error-color) !important;
+}
 
-    const newSnippet: Snippet = {
-      id: snippet?.id || `snip_${Date.now()}`,
-      trigger: useRegex ? null : trigger,
-      regex: useRegex ? regex : null,
-      replace,
-      label: label || null,
-      category: category || null,
-      word: matchWord,
-      uppercase_style: snippet?.uppercase_style || null,
-      image_path: imagePath || null,
-      shell: shellCmd || null,
-      form_fields: snippet?.form_fields || null,
-      filter_app: filterApp || null,
-      usage_count: snippet?.usage_count ?? 0,
-      updated_at: Math.floor(Date.now() / 1000),
-      is_favorite: snippet?.is_favorite ?? false,
-      deleted_at: snippet?.deleted_at ?? null,
-    };
-    onSave(newSnippet);
-  };
+.form-error {
+  font-size: 0.8rem;
+  color: var(--error-color);
+  margin-top: 6px;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  line-height: 1.4;
+}
 
-  // Show error only after first submit attempt or if the field has been touched
-  const showError = (field: keyof ValidationErrors) => hasAttemptedSubmit && errors[field];
-
-  return (
-    <>
-      <div className="content-area content-area-padded">
-        <div className="view-header">
-          <div>
-            <h2 className="header-title">
-              {snippet ? "Edit Snippet" : "Create Snippet"}
-            </h2>
-            <p className="view-description">
-              Define your shortcut and expansion text.
-            </p>
-          </div>
-        </div>
-        
-        <form onSubmit={handleSubmit}>
-          <div style={{ maxWidth: 600 }}>
-            <div className="form-group">
-              <label className="form-label">Label (optional)</label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="e.g., Email Signature"
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Category</label>
-              <input
-                type="text"
-                list="category-suggestions"
-                className="form-input"
-                placeholder="e.g., Development, Communication"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-              />
-              <datalist id="category-suggestions">
-                {existingCategories.map(cat => <option key={cat} value={cat} />)}
-              </datalist>
-            </div>
-
-            <div className="form-group">
-              <div className="form-group-header">
-                <label className="form-label mb-0">
-                  {useRegex ? "Regex Pattern" : "Trigger"}
-                </label>
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={useRegex}
-                    onChange={(e) => setUseRegex(e.target.checked)}
-                  />
-                  Use Regex
-                </label>
-              </div>
-              <input
-                className={`form-input font-mono${showError("trigger") ? " form-input-error" : ""}`}
-                placeholder={useRegex ? "e.g., :sig(\\d+)" : "e.g., :hello"}
-                value={useRegex ? regex : trigger}
-                onChange={(e) =>
-                  useRegex ? setRegex(e.target.value) : setTrigger(e.target.value)
-                }
-              />
-              {showError("trigger") && (
-                <p className="form-error">{errors.trigger}</p>
-              )}
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Replacement Text</label>
-              <textarea
-                className={`form-input form-textarea${showError("replace") ? " form-input-error" : ""}`}
-                placeholder="Enter the text to expand to..."
-                value={replace}
-                onChange={(e) => setReplace(e.target.value)}
-              />
-              {showError("replace") && (
-                <p className="form-error">{errors.replace}</p>
-              )}
-              <p className="form-hint">
-                Variables: 
-                <button type="button" onClick={() => insertVariable("{{date}}")} style={{ background: "none", border: "none", color: "var(--primary-color)", cursor: "pointer", padding: "0 4px" }}>{`{{date}}`}</button>,
-                <button type="button" onClick={() => insertVariable("{{time}}")} style={{ background: "none", border: "none", color: "var(--primary-color)", cursor: "pointer", padding: "0 4px" }}>{`{{time}}`}</button>,
-                <button type="button" onClick={() => insertVariable("{{clipboard}}")} style={{ background: "none", border: "none", color: "var(--primary-color)", cursor: "pointer", padding: "0 4px" }}>{`{{clipboard}}`}</button>,
-                <button type="button" onClick={() => insertVariable("{{weekday}}")} style={{ background: "none", border: "none", color: "var(--primary-color)", cursor: "pointer", padding: "0 4px" }}>{`{{weekday}}`}</button>
-              </p>
-            </div>
-
-            <div className="form-group" style={{ marginTop: "var(--space-lg)" }}>
-              <button 
-                type="button" 
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                style={{ display: "flex", alignItems: "center", gap: "8px", background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer", fontSize: "0.875rem", padding: 0 }}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: "20px", transition: "transform 0.2s", transform: showAdvanced ? "rotate(90deg)" : "rotate(0deg)" }}>
-                  chevron_right
-                </span>
-                {showAdvanced ? "Hide Advanced Options" : "Show Advanced Options"}
-              </button>
-            </div>
-
-            {showAdvanced && (
-              <div style={{ paddingLeft: "28px", display: "flex", flexDirection: "column", gap: "var(--space-md)", borderLeft: "2px solid var(--border-color)", marginLeft: "10px", marginTop: "var(--space-md)" }}>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="checkbox-label" style={{ color: "var(--text-primary)" }}>
-                    <input
-                      type="checkbox"
-                      checked={matchWord}
-                      onChange={(e) => setMatchWord(e.target.checked)}
-                    />
-                    Match Whole Word Only
-                  </label>
-                  <p className="form-hint" style={{ marginLeft: "24px" }}>
-                    Trigger will only fire if surrounded by spaces or punctuation.
-                  </p>
-                </div>
-
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Filter by Application</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="e.g., Code.exe, chrome.exe"
-                    value={filterApp}
-                    onChange={(e) => setFilterApp(e.target.value)}
-                  />
-                  <p className="form-hint">
-                    Only expand this snippet when the specified app is in the foreground.
-                  </p>
-                </div>
-
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Run Shell Command</label>
-                  <input
-                    type="text"
-                    className="form-input font-mono"
-                    placeholder="e.g., echo 'Hello'"
-                    value={shellCmd}
-                    onChange={(e) => setShellCmd(e.target.value)}
-                  />
-                  <p className="form-hint">
-                    Execute a system command after expanding the snippet.
-                  </p>
-                </div>
-
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Image Path</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="C:\path\to\image.png"
-                    value={imagePath}
-                    onChange={(e) => setImagePath(e.target.value)}
-                  />
-                  <p className="form-hint">
-                    Optionally paste an image alongside the text.
-                  </p>
-                </div>
-              </div>
-            )}
-
-          <div className="form-actions">
-            <Button type="button" variant="secondary" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="primary" disabled={hasAttemptedSubmit && hasErrors}>
-              {snippet ? "Save Changes" : "Save Snippet"}
-            </Button>
-          </div>
-          </div>
-        </form>
-      </div>
-    </>
-  );
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-md);
+  margin-top: var(--space-xl);
 }
 </file>
 
@@ -2107,79 +1810,6 @@ input[type="range"].range-slider::-webkit-slider-thumb:hover {
 }
 </file>
 
-<file path="src/types.ts">
-export interface Snippet {
-  id: string;
-  trigger: string | null;
-  regex: string | null;
-  replace: string;
-  label: string | null;
-  word: boolean;
-  uppercase_style: string | null;
-  image_path: string | null;
-  shell: string | null;
-  form_fields: FormField[] | null;
-  filter_app: string | null;
-  category?: string | null;
-  usage_count?: number | null;
-  updated_at?: number | null;
-  is_favorite?: boolean | null;
-  deleted_at?: number | null;
-}
-
-export interface FormField {
-  name: string;
-  label: string | null;
-  default: string;
-  field_type: string;
-  choices: string[] | null;
-}
-
-export interface AppSettings {
-  enabled: boolean;
-  injection_method: string;
-  search_hotkey: string;
-  undo_backspace_ms: number;
-  start_with_windows: boolean;
-  show_in_tray: boolean;
-  theme: string;
-  toggle_hotkey: string | null;
-}
-
-export interface EngineStatus {
-  enabled: boolean;
-  hook_installed: boolean;
-}
-
-export interface SnippetsViewProps {
-  activeTab: string;
-  snippets: Snippet[];
-  onEdit: (snippet: Snippet) => void;
-  onDelete: (id: string) => void;
-  onUpdate: (id: string, snippet: Snippet) => void;
-}
-
-export interface SnippetEditorProps {
-  snippet: Snippet | null;
-  existingCategories: string[];
-  existingSnippets: Snippet[];
-  onSave: (snippet: Snippet) => void;
-  onClose: () => void;
-}
-
-export interface SettingsViewProps {
-  settings: AppSettings | null;
-  onSave: () => void;
-}
-
-export interface SidebarProps {
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
-  snippets: Snippet[];
-  onNewSnippet: () => void;
-}
-</file>
-
 <file path="index.html">
 <!doctype html>
 <html lang="en">
@@ -2305,6 +1935,308 @@ export function Sidebar({ activeTab, setActiveTab, snippets, onNewSnippet }: Sid
         </div>
       </div>
     </aside>
+  );
+}
+</file>
+
+<file path="src/components/modals/SnippetEditor.tsx">
+import React, { useState, useMemo } from "react";
+import { Snippet, SnippetEditorProps } from "../../types";
+import { Button } from "../ui/Button";
+
+
+interface ValidationErrors {
+  trigger?: string;
+  replace?: string;
+}
+
+export function SnippetEditor({ snippet, existingCategories, existingSnippets, onSave, onClose }: SnippetEditorProps) {
+  const [trigger, setTrigger] = useState(snippet?.trigger || "");
+  const [replace, setReplace] = useState(snippet?.replace || "");
+  const [label, setLabel] = useState(snippet?.label || "");
+  const [useRegex, setUseRegex] = useState(!!snippet?.regex);
+  const [regex, setRegex] = useState(snippet?.regex || "");
+  const [category, setCategory] = useState(snippet?.category || "");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [filterApp, setFilterApp] = useState(snippet?.filter_app || "");
+  const [shellCmd, setShellCmd] = useState(snippet?.shell || "");
+  const [imagePath, setImagePath] = useState(snippet?.image_path || "");
+  const [matchWord, setMatchWord] = useState(!!snippet?.word);
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
+
+  // Get triggers from other snippets (exclude self when editing, exclude deleted)
+  const otherTriggers = useMemo(() => {
+    return existingSnippets
+      .filter(s => !s.deleted_at && s.trigger && s.id !== snippet?.id)
+      .map(s => ({ trigger: s.trigger!, label: s.label }));
+  }, [existingSnippets, snippet?.id]);
+
+  // Validate the form and return errors
+  const errors = useMemo((): ValidationErrors => {
+    const errs: ValidationErrors = {};
+
+    if (useRegex) {
+      // Regex validation
+      if (!regex.trim()) {
+        errs.trigger = "Regex pattern is required.";
+      } else {
+        try {
+          new RegExp(regex);
+        } catch {
+          errs.trigger = "Invalid regex syntax.";
+        }
+      }
+    } else {
+      // Trigger validation
+      if (!trigger.trim()) {
+        errs.trigger = "Trigger is required.";
+      } else {
+        // Check for exact duplicate
+        const duplicate = otherTriggers.find(t => t.trigger === trigger);
+        if (duplicate) {
+          const name = duplicate.label ? `"${duplicate.label}"` : `"${duplicate.trigger}"`;
+          errs.trigger = `This trigger already exists in snippet ${name}.`;
+        } else {
+          // Check for prefix collisions
+          // Case 1: An existing trigger is a prefix of the new one
+          // e.g., existing ":mail" would fire before user can finish typing ":mail2"
+          const blockedBy = otherTriggers.find(t => trigger.startsWith(t.trigger) && trigger !== t.trigger);
+          if (blockedBy) {
+            const name = blockedBy.label ? `"${blockedBy.label}"` : `"${blockedBy.trigger}"`;
+            errs.trigger = `Conflict: existing snippet ${name} with trigger "${blockedBy.trigger}" will fire before you can finish typing this trigger.`;
+          }
+
+          // Case 2: The new trigger is a prefix of an existing one
+          // e.g., adding ":mail" would prevent ":mail2" from ever being reached
+          const blocks = otherTriggers.find(t => t.trigger.startsWith(trigger) && t.trigger !== trigger);
+          if (!errs.trigger && blocks) {
+            const name = blocks.label ? `"${blocks.label}"` : `"${blocks.trigger}"`;
+            errs.trigger = `Conflict: this trigger will fire before the user can finish typing "${blocks.trigger}" (snippet ${name}).`;
+          }
+        }
+      }
+    }
+
+    // Replacement text validation
+    if (!replace.trim()) {
+      errs.replace = "Replacement text is required.";
+    }
+
+    return errs;
+  }, [trigger, regex, replace, useRegex, otherTriggers]);
+
+  const hasErrors = Object.keys(errors).length > 0;
+
+  const insertVariable = (variable: string) => {
+    setReplace((prev) => prev + variable);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setHasAttemptedSubmit(true);
+
+    if (hasErrors) {
+      return;
+    }
+
+    const newSnippet: Snippet = {
+      id: snippet?.id || `snip_${Date.now()}`,
+      trigger: useRegex ? null : trigger,
+      regex: useRegex ? regex : null,
+      replace,
+      label: label || null,
+      category: category || null,
+      word: matchWord,
+      uppercase_style: snippet?.uppercase_style || null,
+      image_path: imagePath || null,
+      shell: shellCmd || null,
+      form_fields: snippet?.form_fields || null,
+      filter_app: filterApp || null,
+      usage_count: snippet?.usage_count ?? 0,
+      updated_at: Math.floor(Date.now() / 1000),
+      is_favorite: snippet?.is_favorite ?? false,
+      deleted_at: snippet?.deleted_at ?? null,
+    };
+    onSave(newSnippet);
+  };
+
+  // Show error only after first submit attempt or if the field has been touched
+  const showError = (field: keyof ValidationErrors) => hasAttemptedSubmit && errors[field];
+
+  return (
+    <>
+      <div className="content-area content-area-padded">
+        <div className="view-header">
+          <div>
+            <h2 className="header-title">
+              {snippet ? "Edit Snippet" : "Create Snippet"}
+            </h2>
+            <p className="view-description">
+              Define your shortcut and expansion text.
+            </p>
+          </div>
+        </div>
+        
+        <form onSubmit={handleSubmit}>
+          <div style={{ maxWidth: 600 }}>
+            <div className="form-group">
+              <label className="form-label">Label (optional)</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g., Email Signature"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Category</label>
+              <input
+                type="text"
+                list="category-suggestions"
+                className="form-input"
+                placeholder="e.g., Development, Communication"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              />
+              <datalist id="category-suggestions">
+                {existingCategories.map(cat => <option key={cat} value={cat} />)}
+              </datalist>
+            </div>
+
+            <div className="form-group">
+              <div className="form-group-header">
+                <label className="form-label mb-0">
+                  {useRegex ? "Regex Pattern" : "Trigger"}
+                </label>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={useRegex}
+                    onChange={(e) => setUseRegex(e.target.checked)}
+                  />
+                  Use Regex
+                </label>
+              </div>
+              <input
+                className={`form-input font-mono${showError("trigger") ? " form-input-error" : ""}`}
+                placeholder={useRegex ? "e.g., :sig(\\d+)" : "e.g., :hello"}
+                value={useRegex ? regex : trigger}
+                onChange={(e) =>
+                  useRegex ? setRegex(e.target.value) : setTrigger(e.target.value)
+                }
+              />
+              {showError("trigger") && (
+                <p className="form-error">{errors.trigger}</p>
+              )}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Replacement Text</label>
+              <textarea
+                className={`form-input form-textarea${showError("replace") ? " form-input-error" : ""}`}
+                placeholder="Enter the text to expand to..."
+                value={replace}
+                onChange={(e) => setReplace(e.target.value)}
+              />
+              {showError("replace") && (
+                <p className="form-error">{errors.replace}</p>
+              )}
+              <p className="form-hint">
+                Variables: 
+                <button type="button" onClick={() => insertVariable("{{date}}")} style={{ background: "none", border: "none", color: "var(--primary-color)", cursor: "pointer", padding: "0 4px" }}>{`{{date}}`}</button>,
+                <button type="button" onClick={() => insertVariable("{{time}}")} style={{ background: "none", border: "none", color: "var(--primary-color)", cursor: "pointer", padding: "0 4px" }}>{`{{time}}`}</button>,
+                <button type="button" onClick={() => insertVariable("{{clipboard}}")} style={{ background: "none", border: "none", color: "var(--primary-color)", cursor: "pointer", padding: "0 4px" }}>{`{{clipboard}}`}</button>,
+                <button type="button" onClick={() => insertVariable("{{weekday}}")} style={{ background: "none", border: "none", color: "var(--primary-color)", cursor: "pointer", padding: "0 4px" }}>{`{{weekday}}`}</button>
+              </p>
+            </div>
+
+            <div className="form-group" style={{ marginTop: "var(--space-lg)" }}>
+              <button 
+                type="button" 
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                style={{ display: "flex", alignItems: "center", gap: "8px", background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer", fontSize: "0.875rem", padding: 0 }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: "20px", transition: "transform 0.2s", transform: showAdvanced ? "rotate(90deg)" : "rotate(0deg)" }}>
+                  chevron_right
+                </span>
+                {showAdvanced ? "Hide Advanced Options" : "Show Advanced Options"}
+              </button>
+            </div>
+
+            {showAdvanced && (
+              <div style={{ paddingLeft: "28px", display: "flex", flexDirection: "column", gap: "var(--space-md)", borderLeft: "2px solid var(--border-color)", marginLeft: "10px", marginTop: "var(--space-md)" }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="checkbox-label" style={{ color: "var(--text-primary)" }}>
+                    <input
+                      type="checkbox"
+                      checked={matchWord}
+                      onChange={(e) => setMatchWord(e.target.checked)}
+                    />
+                    Match Whole Word Only
+                  </label>
+                  <p className="form-hint" style={{ marginLeft: "24px" }}>
+                    Trigger will only fire if surrounded by spaces or punctuation.
+                  </p>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Filter by Application</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g., Code.exe, chrome.exe"
+                    value={filterApp}
+                    onChange={(e) => setFilterApp(e.target.value)}
+                  />
+                  <p className="form-hint">
+                    Only expand this snippet when the specified app is in the foreground.
+                  </p>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Run Shell Command</label>
+                  <input
+                    type="text"
+                    className="form-input font-mono"
+                    placeholder="e.g., echo 'Hello'"
+                    value={shellCmd}
+                    onChange={(e) => setShellCmd(e.target.value)}
+                  />
+                  <p className="form-hint">
+                    Execute a system command after expanding the snippet.
+                  </p>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Image Path</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="C:\path\to\image.png"
+                    value={imagePath}
+                    onChange={(e) => setImagePath(e.target.value)}
+                  />
+                  <p className="form-hint">
+                    Optionally paste an image alongside the text.
+                  </p>
+                </div>
+              </div>
+            )}
+
+          <div className="form-actions">
+            <Button type="button" variant="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" disabled={hasAttemptedSubmit && hasErrors}>
+              {snippet ? "Save Changes" : "Save Snippet"}
+            </Button>
+          </div>
+          </div>
+        </form>
+      </div>
+    </>
   );
 }
 </file>
@@ -2490,6 +2422,79 @@ export function SnippetsView({ activeTab, snippets, onEdit, onDelete, onUpdate }
       </div>
     </>
   );
+}
+</file>
+
+<file path="src/types.ts">
+export interface Snippet {
+  id: string;
+  trigger: string | null;
+  regex: string | null;
+  replace: string;
+  label: string | null;
+  word: boolean;
+  uppercase_style: string | null;
+  image_path: string | null;
+  shell: string | null;
+  form_fields: FormField[] | null;
+  filter_app: string | null;
+  category?: string | null;
+  usage_count?: number | null;
+  updated_at?: number | null;
+  is_favorite?: boolean | null;
+  deleted_at?: number | null;
+}
+
+export interface FormField {
+  name: string;
+  label: string | null;
+  default: string;
+  field_type: string;
+  choices: string[] | null;
+}
+
+export interface AppSettings {
+  enabled: boolean;
+  injection_method: string;
+  search_hotkey: string;
+  undo_backspace_ms: number;
+  start_with_windows: boolean;
+  show_in_tray: boolean;
+  theme: string;
+  toggle_hotkey: string | null;
+}
+
+export interface EngineStatus {
+  enabled: boolean;
+  hook_installed: boolean;
+}
+
+export interface SnippetsViewProps {
+  activeTab: string;
+  snippets: Snippet[];
+  onEdit: (snippet: Snippet) => void;
+  onDelete: (id: string) => void;
+  onUpdate: (id: string, snippet: Snippet) => void;
+}
+
+export interface SnippetEditorProps {
+  snippet: Snippet | null;
+  existingCategories: string[];
+  existingSnippets: Snippet[];
+  onSave: (snippet: Snippet) => void;
+  onClose: () => void;
+}
+
+export interface SettingsViewProps {
+  settings: AppSettings | null;
+  onSave: () => void;
+}
+
+export interface SidebarProps {
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+  snippets: Snippet[];
+  onNewSnippet: () => void;
 }
 </file>
 
@@ -3038,223 +3043,10 @@ fn get_clipboard_text() -> Option<String> {
 }
 </file>
 
-<file path="src/App.tsx">
-import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
-
-import type { Snippet, AppSettings, EngineStatus } from "./types";
-
-import { Sidebar } from "./components/layout/Sidebar";
-import { SnippetsView } from "./components/views/SnippetsView";
-import { SettingsView } from "./components/views/SettingsView";
-import { SnippetEditor } from "./components/modals/SnippetEditor";
-import { Toggle } from "./components/ui/Toggle";
-
-// Main App Component
-function App() {
-  const [activeTab, setActiveTab] = useState<string>("snippets");
-  const [snippets, setSnippets] = useState<Snippet[]>([]);
-  const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [engineStatus, setEngineStatus] = useState<EngineStatus | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [editingSnippet, setEditingSnippet] = useState<Snippet | null>(null);
-
-  const existingCategories = Array.from(new Set(snippets.filter(s => !s.deleted_at).map(s => s.category || "General"))).sort();
-
-  // Load data on mount
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    try {
-      const [snips, sets, status] = await Promise.all([
-        invoke<Snippet[]>("get_snippets"),
-        invoke<AppSettings>("get_settings"),
-        invoke<EngineStatus>("get_engine_status"),
-      ]);
-      setSnippets(snips);
-      setSettings(sets);
-      setEngineStatus(status);
-    } catch (err) {
-      console.error("Failed to load data:", err);
-    }
-  };
-
-  // Apply theme when settings change
-  useEffect(() => {
-    if (settings?.theme) {
-      const root = document.documentElement;
-      if (settings.theme === "system") {
-        // Check system preference
-        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        root.setAttribute("data-theme", prefersDark ? "dark" : "light");
-      } else {
-        root.setAttribute("data-theme", settings.theme);
-      }
-    }
-  }, [settings?.theme]);
-
-  const handleSearch = async (query: string) => {
-    setSearchQuery(query);
-    if (query.trim()) {
-      try {
-        const results = await invoke<Snippet[]>("search_snippets", { query });
-        setSnippets(results);
-      } catch (err) {
-        console.error("Search failed:", err);
-      }
-    } else {
-      const snips = await invoke<Snippet[]>("get_snippets");
-      setSnippets(snips);
-    }
-  };
-
-  const handleToggleEngine = async () => {
-    if (!engineStatus) return;
-    try {
-      await invoke("toggle_engine", { enabled: !engineStatus.enabled });
-      const status = await invoke<EngineStatus>("get_engine_status");
-      setEngineStatus(status);
-    } catch (err) {
-      console.error("Failed to toggle engine:", err);
-    }
-  };
-
-  const handleSaveSnippet = async (snippet: Snippet) => {
-    try {
-      if (editingSnippet && editingSnippet.id) {
-        await invoke("update_snippet", { id: editingSnippet.id, snippet });
-      } else {
-        await invoke("add_snippet", { snippet });
-      }
-      await loadData();
-      setActiveTab("snippets");
-      setEditingSnippet(null);
-    } catch (err) {
-      console.error("Failed to save snippet:", err);
-    }
-  };
-
-  const handleUpdateSnippet = async (id: string, snippet: Snippet) => {
-    try {
-      const updatedSnippet = { ...snippet, updated_at: Math.floor(Date.now() / 1000) };
-      await invoke("update_snippet", { id, snippet: updatedSnippet });
-      await loadData();
-    } catch (err) {
-      console.error("Failed to update snippet:", err);
-    }
-  };
-
-  const handleDeleteSnippet = async (id: string) => {
-    try {
-      const snippet = snippets.find(s => s.id === id);
-      if (snippet && !snippet.deleted_at && activeTab !== "trash") {
-        // Soft delete
-        const updated = { ...snippet, deleted_at: Date.now() };
-        await invoke("update_snippet", { id, snippet: updated });
-      } else {
-        // Hard delete
-        await invoke("delete_snippet", { id });
-      }
-      await loadData();
-    } catch (err) {
-      console.error("Failed to delete snippet:", err);
-    }
-  };
-
-  const handleEditSnippet = (snippet: Snippet) => {
-    setEditingSnippet(snippet);
-    setActiveTab("editor");
-  };
-
-  const handleNewSnippet = () => {
-    setEditingSnippet(null);
-    setActiveTab("editor");
-  };
-
-  return (
-    <div className="app">
-      {/* Sidebar */}
-      <Sidebar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        snippets={snippets}
-        onNewSnippet={handleNewSnippet}
-      />
-
-      {/* Main Content */}
-      <main className="main-content">
-        {/* Top App Bar */}
-        <header className="top-app-bar">
-          <div className="search-wrapper">
-            <span className="search-icon">
-              <span className="material-symbols-outlined search-icon-symbol">search</span>
-            </span>
-            <input
-              type="text"
-              className="search-input"
-              placeholder="Search snippets, tags, or content..."
-              value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
-            />
-          </div>
-          <div className="top-bar-actions">
-            <div className="engine-toggle-wrapper">
-              <div className="engine-toggle-label">
-                <span className="material-symbols-outlined engine-toggle-icon">power_settings_new</span>
-                <span className="engine-toggle-text">Engine</span>
-              </div>
-              <Toggle active={engineStatus?.enabled || false} onClick={handleToggleEngine} />
-            </div>
-            <button className="btn-icon" onClick={loadData} title="Sync/Refresh">
-              <span className="material-symbols-outlined">sync</span>
-            </button>
-            <button className="btn-icon" onClick={() => setActiveTab("settings")} title="Settings">
-              <span className="material-symbols-outlined">settings</span>
-            </button>
-          </div>
-        </header>
-
-        {(activeTab === "snippets" || activeTab === "favorites" || activeTab === "trash" || activeTab.startsWith("collection:")) && (
-          <SnippetsView
-            activeTab={activeTab}
-            snippets={snippets}
-            onEdit={handleEditSnippet}
-            onDelete={handleDeleteSnippet}
-            onUpdate={handleUpdateSnippet}
-          />
-        )}
-        
-        {activeTab === "settings" && (
-          <SettingsView settings={settings} onSave={loadData} />
-        )}
-        
-        {activeTab === "editor" && (
-          <SnippetEditor
-            snippet={editingSnippet}
-            existingCategories={existingCategories}
-            existingSnippets={snippets}
-            onSave={handleSaveSnippet}
-            onClose={() => {
-              setActiveTab("snippets");
-              setEditingSnippet(null);
-            }}
-          />
-        )}
-      </main>
-    </div>
-  );
-}
-
-export default App;
-</file>
-
 <file path="src-tauri/Cargo.toml">
 [package]
 name = "swifttype"
-version = "0.1.1-alpha.1"
+version = "0.1.1-alpha.2"
 description = "SwiftType - A Modern Text Expander"
 authors = ["SwiftType"]
 edition = "2021"
@@ -3516,7 +3308,7 @@ pub fn is_hook_installed() -> bool {
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "SwiftType",
-  "version": "0.1.1-alpha.1",
+  "version": "0.1.1-alpha.2",
   "identifier": "com.swifttype.app",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -3556,11 +3348,224 @@ pub fn is_hook_installed() -> bool {
 }
 </file>
 
+<file path="src/App.tsx">
+import { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import "./App.css";
+
+import type { Snippet, AppSettings, EngineStatus } from "./types";
+
+import { Sidebar } from "./components/layout/Sidebar";
+import { SnippetsView } from "./components/views/SnippetsView";
+import { SettingsView } from "./components/views/SettingsView";
+import { SnippetEditor } from "./components/modals/SnippetEditor";
+import { Toggle } from "./components/ui/Toggle";
+
+// Main App Component
+function App() {
+  const [activeTab, setActiveTab] = useState<string>("snippets");
+  const [snippets, setSnippets] = useState<Snippet[]>([]);
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [engineStatus, setEngineStatus] = useState<EngineStatus | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [editingSnippet, setEditingSnippet] = useState<Snippet | null>(null);
+
+  const existingCategories = Array.from(new Set(snippets.filter(s => !s.deleted_at).map(s => s.category || "General"))).sort();
+
+  // Load data on mount
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const [snips, sets, status] = await Promise.all([
+        invoke<Snippet[]>("get_snippets"),
+        invoke<AppSettings>("get_settings"),
+        invoke<EngineStatus>("get_engine_status"),
+      ]);
+      setSnippets(snips);
+      setSettings(sets);
+      setEngineStatus(status);
+    } catch (err) {
+      console.error("Failed to load data:", err);
+    }
+  };
+
+  // Apply theme when settings change
+  useEffect(() => {
+    if (settings?.theme) {
+      const root = document.documentElement;
+      if (settings.theme === "system") {
+        // Check system preference
+        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        root.setAttribute("data-theme", prefersDark ? "dark" : "light");
+      } else {
+        root.setAttribute("data-theme", settings.theme);
+      }
+    }
+  }, [settings?.theme]);
+
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query);
+    if (query.trim()) {
+      try {
+        const results = await invoke<Snippet[]>("search_snippets", { query });
+        setSnippets(results);
+      } catch (err) {
+        console.error("Search failed:", err);
+      }
+    } else {
+      const snips = await invoke<Snippet[]>("get_snippets");
+      setSnippets(snips);
+    }
+  };
+
+  const handleToggleEngine = async () => {
+    if (!engineStatus) return;
+    try {
+      await invoke("toggle_engine", { enabled: !engineStatus.enabled });
+      const status = await invoke<EngineStatus>("get_engine_status");
+      setEngineStatus(status);
+    } catch (err) {
+      console.error("Failed to toggle engine:", err);
+    }
+  };
+
+  const handleSaveSnippet = async (snippet: Snippet) => {
+    try {
+      if (editingSnippet && editingSnippet.id) {
+        await invoke("update_snippet", { id: editingSnippet.id, snippet });
+      } else {
+        await invoke("add_snippet", { snippet });
+      }
+      await loadData();
+      setActiveTab("snippets");
+      setEditingSnippet(null);
+    } catch (err) {
+      console.error("Failed to save snippet:", err);
+    }
+  };
+
+  const handleUpdateSnippet = async (id: string, snippet: Snippet) => {
+    try {
+      const updatedSnippet = { ...snippet, updated_at: Math.floor(Date.now() / 1000) };
+      await invoke("update_snippet", { id, snippet: updatedSnippet });
+      await loadData();
+    } catch (err) {
+      console.error("Failed to update snippet:", err);
+    }
+  };
+
+  const handleDeleteSnippet = async (id: string) => {
+    try {
+      const snippet = snippets.find(s => s.id === id);
+      if (snippet && !snippet.deleted_at && activeTab !== "trash") {
+        // Soft delete
+        const updated = { ...snippet, deleted_at: Date.now() };
+        await invoke("update_snippet", { id, snippet: updated });
+      } else {
+        // Hard delete
+        await invoke("delete_snippet", { id });
+      }
+      await loadData();
+    } catch (err) {
+      console.error("Failed to delete snippet:", err);
+    }
+  };
+
+  const handleEditSnippet = (snippet: Snippet) => {
+    setEditingSnippet(snippet);
+    setActiveTab("editor");
+  };
+
+  const handleNewSnippet = () => {
+    setEditingSnippet(null);
+    setActiveTab("editor");
+  };
+
+  return (
+    <div className="app">
+      {/* Sidebar */}
+      <Sidebar 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        snippets={snippets}
+        onNewSnippet={handleNewSnippet}
+      />
+
+      {/* Main Content */}
+      <main className="main-content">
+        {/* Top App Bar */}
+        <header className="top-app-bar">
+          <div className="search-wrapper">
+            <span className="search-icon">
+              <span className="material-symbols-outlined search-icon-symbol">search</span>
+            </span>
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Search snippets, tags, or content..."
+              value={searchQuery}
+              onChange={(e) => handleSearch(e.target.value)}
+            />
+          </div>
+          <div className="top-bar-actions">
+            <div className="engine-toggle-wrapper">
+              <div className="engine-toggle-label">
+                <span className="material-symbols-outlined engine-toggle-icon">power_settings_new</span>
+                <span className="engine-toggle-text">Engine</span>
+              </div>
+              <Toggle active={engineStatus?.enabled || false} onClick={handleToggleEngine} />
+            </div>
+            <button className="btn-icon" onClick={loadData} title="Sync/Refresh">
+              <span className="material-symbols-outlined">sync</span>
+            </button>
+            <button className="btn-icon" onClick={() => setActiveTab("settings")} title="Settings">
+              <span className="material-symbols-outlined">settings</span>
+            </button>
+          </div>
+        </header>
+
+        {(activeTab === "snippets" || activeTab === "favorites" || activeTab === "trash" || activeTab.startsWith("collection:")) && (
+          <SnippetsView
+            activeTab={activeTab}
+            snippets={snippets}
+            onEdit={handleEditSnippet}
+            onDelete={handleDeleteSnippet}
+            onUpdate={handleUpdateSnippet}
+          />
+        )}
+        
+        {activeTab === "settings" && (
+          <SettingsView settings={settings} onSave={loadData} />
+        )}
+        
+        {activeTab === "editor" && (
+          <SnippetEditor
+            snippet={editingSnippet}
+            existingCategories={existingCategories}
+            existingSnippets={snippets}
+            onSave={handleSaveSnippet}
+            onClose={() => {
+              setActiveTab("snippets");
+              setEditingSnippet(null);
+            }}
+          />
+        )}
+      </main>
+    </div>
+  );
+}
+
+export default App;
+</file>
+
 <file path="package.json">
 {
   "name": "tauri-app",
   "private": true,
-  "version": "0.1.1-alpha.1",
+  "version": "0.1.1-alpha.2",
   "type": "module",
   "scripts": {
     "dev": "vite",

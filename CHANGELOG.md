@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.1-alpha.2] - 2026-07-31
+
+- feat: add frontend snippet validation and prefix collision detection
+- feat: enforce single app instance and start autostarted app in system tray
+
 ## [0.1.1-alpha.1] - 2026-07-11
 
 - fix: use Tauri confirm dialog for snippet import to fix IPC serialization error
