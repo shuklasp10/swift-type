@@ -52,6 +52,7 @@ export interface SnippetsViewProps {
 export interface SnippetEditorProps {
   snippet: Snippet | null;
   existingCategories: string[];
+  existingSnippets: Snippet[];
   onSave: (snippet: Snippet) => void;
   onClose: () => void;
 }

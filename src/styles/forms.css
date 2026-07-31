@@ -63,6 +63,24 @@
   margin-top: var(--space-xs);
 }
 
+.form-input-error {
+  border-color: var(--error-color) !important;
+}
+
+.form-input-error:focus {
+  box-shadow: 0 0 0 1px var(--error-color) !important;
+}
+
+.form-error {
+  font-size: 0.8rem;
+  color: var(--error-color);
+  margin-top: 6px;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  line-height: 1.4;
+}
+
 .form-actions {
   display: flex;
   justify-content: flex-end;

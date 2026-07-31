@@ -98,7 +98,8 @@ function App() {
 
   const handleUpdateSnippet = async (id: string, snippet: Snippet) => {
     try {
-      await invoke("update_snippet", { id, snippet });
+      const updatedSnippet = { ...snippet, updated_at: Math.floor(Date.now() / 1000) };
+      await invoke("update_snippet", { id, snippet: updatedSnippet });
       await loadData();
     } catch (err) {
       console.error("Failed to update snippet:", err);
@@ -193,6 +194,7 @@ function App() {
           <SnippetEditor
             snippet={editingSnippet}
             existingCategories={existingCategories}
+            existingSnippets={snippets}
             onSave={handleSaveSnippet}
             onClose={() => {
               setActiveTab("snippets");
